@@ -1,191 +1,258 @@
-# Panneau d'Administration - Gestion de Produits et Clients (Test Biloki)
-
-## 📋 Contexte du Projet
-Ce projet est une application web développée dans le cadre d'un test technique pour **Biloki**. Il s'agit d'un panel administrateur destiné à la gestion interne de :
-- Produits
-- Stocks de produits
-- Clients
-
-*Conformément aux consignes, la gestion des commandes n'est pas incluse.*
-
----
-
-## 🛠️ Stack Technique & Architecture
-
-L'architecture repose sur une approche monolithique moderne. **Inertia.js** est utilisé pour faire le pont directement entre le backend Laravel et le frontend React, éliminant ainsi le besoin de développer une API REST complexe, tout en offrant une expérience SPA (Single Page Application) fluide.
-
-- **Backend :** Laravel (PHP) packagé avec **Composer**
-- **Frontend :** React.js
-- **Routage & State Management :** Inertia.js
-- **Authentification & Starter Kit :** Laravel Breeze (version React/Inertia)
-- **Gestion des Rôles & Permissions :** Spatie Laravel Permission (pour sécuriser le panel admin)
-- **Stylisation :** Tailwind CSS
+- [Aperçu du projet](#-aperçu-du-projet)
+- [Architecture technique](#-architecture-technique)
+- [Stack technologique](#-stack-technologique)
+- [Structure du dépôt](#-structure-du-dépôt)
+- [Configuration & Installation](#-configuration--installation)
+- [Variables d'environnement](#-variables-denvironnement)
+- [Scripts disponibles](#-scripts-disponibles)
+- [Règles de contribution](#-règles-de-contribution)
+- [Standards de code](#-standards-de-code)
+- [Sécurité](#-sécurité)
+- [Tests](#-tests)
+- [Licence](#-licence)
 
 ---
 
-## 🗄️ Base de Données (Schéma)
+## 🧭 Aperçu du projet
 
-La base de données relationnelle est structurée autour de trois domaines principaux.
+Cette application permet à un établissement de gérer :
 
-### 1. Utilisateurs & Permissions (Spatie)
-- `users` : `id`, `name`, `email`, `password`, `remember_token`, `timestamps`
-- Les tables générées par le package **Spatie** (`roles`, `permissions`, `model_has_roles`, etc.) pour restreindre l'accès à la partie administration.
-
-### 2. Produits & Stock
-- `products`
-  - `id` (Primary Key)
-  - `name` (VARCHAR) : Nom du produit
-  - `description` (TEXT) : Description détaillée
-  - `price` (DECIMAL) : Prix unitaire
-  - `stock_quantity` (INT) : Quantité disponible en stock
-  - 'photoUrl' (TEXT) : lien d'image de produit
-  - `timestamps`
-
-### 3. Clients
-- `clients`
-  - `id` (Primary Key)
-  - `first_name` (VARCHAR) : Prénom du client
-  - `last_name` (VARCHAR) : Nom du client
-  - `email` (VARCHAR) : Adresse email (Unique)
-  - `phone` (VARCHAR) : Numéro de téléphone (Nullable)
-  - `address` (TEXT) : Adresse postale (Nullable)
-  - `timestamps`
+- **3 rôles utilisateurs** : administrateur, enseignant, étudiant
+- **Des cours structurés** en modules/leçons avec progression forcée
+- **Des évaluations** : quiz anti-triche et dépôt de devoirs (PDF, vidéo, images)
+- **Un forum de collaboration** modéré par cours
+- **Des tableaux de bord statistiques** (Chart.js)
 
 ---
 
-## 📂 Architecture des Dossiers
+##  Architecture technique
 
-Voici l'organisation des principaux dossiers et fichiers à respecter tout au long du développement du projet :
+L'application adopte une **architecture monolithique moderne** : un seul projet Laravel sert à la fois la logique métier et le rendu des pages, via **Inertia.js**. Cela élimine le besoin d'une API REST séparée et d'un frontend découplé, tout en conservant une expérience SPA fluide.
 
-```text
-📦 ManageProductTest
- ┣ 📂 app
- ┃ ┣ 📂 Http
- ┃ ┃ ┣ 📂 Controllers   # Logique métier (ProductController, ClientController)
- ┃ ┃ ┣ 📂 Middleware    # Middleware Inertia (HandleInertiaRequests) et Permissions
- ┃ ┃ ┗ 📂 Requests      # FormRequests pour la validation (ex: StoreProductRequest)
- ┃ ┗ 📂 Models          # Modèles Eloquent (User, Product, Client)
- ┣ 📂 database
- ┃ ┣ 📂 migrations      # Fichiers de création des tables
- ┃ ┗ 📂 seeders         # Fichiers d'injection des données de test
- ┣ 📂 resources
- ┃ ┣ 📂 css
- ┃ ┃ ┗ 📜 app.css       # Directives Tailwind CSS
- ┃ ┗ 📂 js
- ┃   ┣ 📂 Components    # Composants React réutilisables (Inputs, Modales, Tables)
- ┃   ┣ 📂 Layouts       # Layout du Panel Administrateur (Sidebar, Navbar)
- ┃   ┣ 📂 Pages         # Pages de l'application (ex: Products/Index, Clients/Create)
- ┃   ┗ 📜 app.jsx       # Point d'entrée principal (Configuration Inertia + React)
- ┣ 📂 routes
- ┃ ┗ 📜 web.php         # Définition des routes et protection via middlewares
- ┗ 📜 tailwind.config.js # Configuration des styles et couleurs Tailwind
+
+##  Stack technologique
+
+- **Backend** : PHP 8.2+, Laravel 11, Eloquent ORM
+- **Authentification** : Laravel Breeze (stack Inertia)
+- **Frontend intégré** : Inertia.js, Vue 3, Vite
+- **Base de données** : MySQL 8
+- **Graphiques** : Chart.js (via composants Vue)
+- **Files d'attente** : Laravel Queue (driver database)
+- **Emails** : Laravel Mail (SMTP / SendGrid / Mailgun)
+
+---
+
+##  Structure du dépôt
+
+```
+projet-elearning/
+├── app/
+│   ├── Http/
+│   │   ├── Controllers/
+│   │   │   ├── Auth/                 # Fourni par Breeze
+│   │   │   ├── CourseController.php
+│   │   │   ├── QuizController.php
+│   │   │   ├── AssignmentController.php
+│   │   │   ├── ForumController.php
+│   │   │   └── DashboardController.php
+│   │   ├── Requests/                 # FormRequests (validation)
+│   │   └── Middleware/
+│   ├── Models/
+│   ├── Policies/                     # RBAC admin/enseignant/étudiant
+│   └── Jobs/                         # Rappels email, traitement vidéo
+├── database/
+│   ├── migrations/
+│   └── seeders/
+├── resources/
+│   ├── js/
+│   │   ├── Pages/                    # Pages Inertia (Vue 3)
+│   │   │   ├── Auth/
+│   │   │   ├── Courses/
+│   │   │   ├── Quizzes/
+│   │   │   ├── Assignments/
+│   │   │   ├── Forum/
+│   │   │   └── Dashboard/
+│   │   ├── Components/               # Composants Vue réutilisables
+│   │   ├── Layouts/
+│   │   └── app.js
+│   └── views/app.blade.php           # Point d'entrée Inertia
+├── routes/
+│   └── web.php
+├── storage/
+│   └── app/                          # Vidéos, PDF, devoirs
+├── tests/
+│   ├── Feature/
+│   └── Unit/
+├── docs/
+│   └── swagger.yaml                  # Documentation des routes internes (optionnel)
+├── .env.example
+└── README.md
 ```
 
 ---
 
-## ⚙️ Configuration d'Inertia.js
-
-Inertia.js agit comme un "ciment" entre Laravel et React. Sa configuration se divise en deux parties principales :
-
-### 1. Côté Backend (Laravel)
-Lors de l'installation de Breeze avec React, un middleware `HandleInertiaRequests.php` est généré dans `app/Http/Middleware/`.
-C'est ici que l'on configure les **données globales (shared data)** partagées avec toutes les pages React, comme :
-- Les informations de l'utilisateur actuellement connecté.
-- Les rôles et permissions de l'utilisateur (via Spatie) pour conditionner l'affichage des boutons dans React.
-- Les messages "Flash" (ex: "Produit ajouté avec succès").
-
-Exemple dans `HandleInertiaRequests.php` :
-```php
-public function share(Request $request): array
-{
-    return array_merge(parent::share($request), [
-        'auth' => [
-            'user' => $request->user(),
-            // Partage des permissions pour le frontend
-            'permissions' => $request->user() ? $request->user()->getAllPermissions()->pluck('name') : [],
-        ],
-        'flash' => [
-            'message' => fn () => $request->session()->get('message')
-        ],
-    ]);
-}
-```
-
-### 2. Côté Frontend (React)
-L'initialisation se fait dans `resources/js/app.jsx`. Inertia s'occupe de résoudre le composant de la page demandée et de l'injecter dans la div `#app` du fichier `resources/views/app.blade.php`.
-Il est également responsable de la configuration de Vite.js pour recharger automatiquement les composants lors du développement (HMR).
-
----
-
-## 🚀 Guide d'Installation (De A à Z)
+## ⚙️ Configuration & Installation
 
 ### Prérequis
-Assurez-vous que votre environnement local dispose des éléments suivants :
-- **PHP** >= 8.1
-- **Composer** (Gestionnaire de paquets PHP)
-- **Node.js** & **NPM** (Gestionnaire de paquets JavaScript)
-- Un serveur de base de données (MySQL, MariaDB, PostgreSQL ou SQLite)
 
-### Étapes d'installation 
+- PHP >= 8.2, Composer >= 2.6
+- Node.js >= 20 (requis uniquement pour compiler les assets Vite/Vue, aucun serveur Node en production)
+- MySQL >= 8
+- React Typescript
 
+### Installation locale
 
-
-**1. Cloner ou initialiser le projet**
-Placez-vous dans le répertoire de votre choix et récupérez le projet :
 ```bash
-git clone <url-du-repo>
-# ou si vous avez l'archive, décompressez-la.
-cd nom-du-projet
-```
+# 1. Cloner le dépôt
+git clone https†********
 
-**2. Installer les dépendances Backend (PHP)**
-```bash
+# 2. Installer les dépendances PHP
 composer install
-```
 
-**3. Installer les dépendances Frontend (JavaScript)**
-```bash
-npm install
-```
-
-**4. Configuration de l'environnement**
-Dupliquez le fichier de configuration d'environnement par défaut :
-```bash
+# 3. Configurer l'environnement
 cp .env.example .env
-```
-Ouvrez ensuite le fichier `.env` nouvellement créé et mettez à jour les accès à votre base de données :
-```env
-DB_CONNECTION=mysql
-DB_HOST=127.0.0.1
-DB_PORT=3306
-DB_DATABASE=nom_de_votre_base_de_donnees
-DB_USERNAME=root
-DB_PASSWORD=votre_mot_de_passe
-```
-
-**5. Générer la clé d'application Laravel**
-```bash
 php artisan key:generate
-```
 
-**6. Création des tables et injection des fausses données**
-Exécutez les migrations pour générer la structure de la base de données, et les seeders pour créer un compte Administrateur par défaut ainsi que des données de test (produits, clients).
-```bash
+# 4. Configurer la base de données dans .env, puis migrer
 php artisan migrate --seed
-```
 
-**7. Lancer l'environnement de développement**
-Pour que le projet fonctionne localement, il faut faire tourner simultanément le serveur PHP et le serveur de compilation front-end (Vite). Ouvrez deux terminaux à la racine du projet.
+# 5. Installer Breeze (si non déjà scaffoldé)
+composer require laravel/breeze --dev
+php artisan breeze:install vue
+# Choisir "Vue" comme stack Inertia, avec options "Dark mode" et "Tests" selon besoin
 
-*Dans le Terminal 1 (Serveur Backend) :*
-```bash
+# 6. Installer les dépendances front (Vite/Vue) et compiler
+npm install
+npm run dev        # développement
+# npm run build     # production
+
+# 7. Lancer le serveur Laravel
 php artisan serve
 ```
 
-*Dans le Terminal 2 (Compilation Frontend) :*
-```bash
-npm run dev
+---
+
+## 🔐 Variables d'environnement
+
+**.env**
+```env
+APP_NAME="E-Learning Platform"
+APP_ENV=local
+APP_KEY=
+APP_DEBUG=true
+APP_URL=http://localhost:8000
+
+DB_CONNECTION=mysql
+DB_HOST=127.0.0.1
+DB_PORT=3306
+DB_DATABASE=elearning
+DB_USERNAME=root
+DB_PASSWORD=
+
+QUEUE_CONNECTION=database
+
+FILESYSTEM_DISK=local
+MAX_VIDEO_UPLOAD_MB=500
+MAX_ASSIGNMENT_UPLOAD_MB=100
+
+MAIL_MAILER=smtp
+MAIL_HOST=smtp.sendgrid.net
+MAIL_PORT=587
+MAIL_USERNAME=apikey
+MAIL_PASSWORD=
+MAIL_FROM_ADDRESS="no-reply@elearning.local"
+MAIL_FROM_NAME="${APP_NAME}"
+
+VITE_APP_NAME="${APP_NAME}"
 ```
 
-L'application est maintenant accessible depuis votre navigateur à l'adresse : **http://localhost:8000**
-Vous pouvez vous connecter au Panel Administrateur avec le compte généré lors du seeding de la base de données.
+> ⚠️ Le fichier `.env` ne doit jamais être commité. Utiliser `.env.example` comme modèle partagé sans valeurs sensibles.
+
+---
+
+## 📜 Scripts disponibles
+
+| Commande | Description |
+|----------|-------------|
+| `php artisan serve` | Démarre le serveur de développement Laravel |
+| `php artisan migrate --seed` | Applique les migrations et les données de test |
+| `php artisan migrate:fresh --seed` | Réinitialise complètement la base de données |
+| `php artisan queue:work` | Traite les files d'attente (emails, tâches asynchrones) |
+| `php artisan test` | Exécute la suite de tests PHPUnit/Pest |
+| `php artisan pint` | Formate le code PHP selon PSR-12 |
+| `npm run dev` | Démarre Vite en mode développement (hot reload) |
+| `npm run build` | Compile les assets Vue/Inertia pour la production |
+
+---
+
+## 🤝 Règles de contribution
+
+### Workflow Git (Git Flow simplifié)
+
+- `main` : code en production, protégé, déploiement automatique
+- `develop` : intégration continue, base de toutes les branches de fonctionnalité
+- `feature/<module>-<nom-fonctionnalité>` : ex. `feature/quiz-questions-aleatoires`
+- `fix/<nom-du-bug>` : correctifs
+- `hotfix/<nom>` : correctifs urgents sur `main`
+
+### Convention de nommage des commits (Conventional Commits)
+
+```
+<type>(<scope>): <description courte>
+
+Types autorisés : feat, fix, docs, style, refactor, perf, test, chore
+Exemples :
+  feat(auth): ajout du changement de mot de passe obligatoire (Breeze)
+  fix(assignments): correction de la validation de taille de fichier
+  docs(readme): mise à jour de la configuration Breeze/Inertia
+```
+
+### Processus de Pull Request
+
+1. Créer une branche depuis `develop`
+2. Développer + tests unitaires/fonctionnels associés obligatoires
+3. Vérifier le linting (`php artisan pint --test`) et les tests (`php artisan test`)
+4. Ouvrir une PR vers `develop` avec description claire (contexte, changements, captures d'écran si UI Inertia)
+5. **Revue de code obligatoire par au moins un autre développeur**
+6. CI (tests + lint) doit passer au vert avant tout merge
+7. Squash & merge uniquement, jamais de merge commit brut
+
+### Règles générales
+
+- Aucun push direct sur `main` ou `develop`
+- Toute variable sensible passe par `.env`, jamais commitée
+- Toute nouvelle route doit être protégée par un middleware d'authentification/rôle explicite
+- Toute fonctionnalité touchant à l'authentification ou aux permissions (Policies) nécessite une revue de sécurité additionnelle
+- Les pages Inertia doivent recevoir leurs données uniquement via les `props` du contrôleur, jamais via appel API externe côté client
+
+---
+
+---
+
+## Sécurité
+
+- Authentification et changement de mot de passe obligatoire via **Laravel Breeze**
+- Hashage des mots de passe (bcrypt, configuration par défaut Laravel)
+- Autorisation par **Policies** pour chaque ressource (cours, quiz, devoirs, forum)
+- Protection CSRF native (tokens gérés automatiquement par Inertia/Breeze)
+- Validation stricte des entrées via `FormRequest`, protection contre l'injection SQL (Eloquent ORM paramétré)
+- Limitation stricte du type et de la taille des fichiers uploadés (vidéos 500 Mo, devoirs 100 Mo) via règles de validation `mimes` et `max`
+- Journalisation des actions sensibles (connexions, suppressions, modifications de notes) via les logs Laravel
+
+---
+
+##  Tests
+
+| Type | Outil | Emplacement |
+|------|-------|-------------|
+| Tests unitaires | PHPUnit / Pest | `tests/Unit` |
+| Tests fonctionnels (routes, contrôleurs) | PHPUnit / Pest | `tests/Feature` |
+| Tests de permissions (Policies) | PHPUnit / Pest | `tests/Feature/Policies` |
+| Tests End-to-End | Cypress ou Playwright (optionnel) | `tests/e2e` |
+
+```bash
+php artisan test
+php artisan test --filter=QuizTest
+php artisan test --coverage
+
+
