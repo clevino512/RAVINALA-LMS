@@ -1,28 +1,31 @@
 import { Link, usePage } from '@inertiajs/react';
 import {
     ArrowRightOnRectangleIcon,
-    CubeIcon,
+    Cog6ToothIcon,
     HomeIcon,
-    UserCircleIcon,
-    UserGroupIcon,
     UsersIcon,
     XMarkIcon,
 } from '@heroicons/react/24/outline';
 import logo from '../../img/educampus_logo.png';
-
-const navigation = [
-    { name: 'Dashboard', href: route('dashboard'), icon: HomeIcon, current: 'dashboard' },
-    { name: 'Produits', href: route('admin.products.index'), icon: CubeIcon, current: 'admin.products.*' },
-    { name: 'Clients', href: route('admin.clients.index'), icon: UserGroupIcon, current: 'admin.clients.*' },
-    { name: 'Utilisateurs', href: route('admin.users.index'), icon: UsersIcon, current: 'admin.users.*' },
-    { name: 'Profil', href: route('profile.edit'), icon: UserCircleIcon, current: 'profile.*' },
-];
 
 const resolveAvatar = (path) => path || logo;
 
 export default function Sidebar({ sidebarOpen, setSidebarOpen }) {
     const { props } = usePage();
     const user = props.auth?.user;
+    const userType = user?.user_type?.name?.toLocaleLowerCase('fr') ?? '';
+    const isAdministrator = ['admin', 'administrateur'].includes(userType);
+    const navigation = [
+        {
+            name: 'Dashboard',
+            href: route('dashboard'),
+            icon: HomeIcon,
+            current: ['dashboard', 'admin.dashboard', 'professeur.dashboard', 'etudiant.dashboard'],
+        },
+        ...(isAdministrator
+            ? [{ name: 'Utilisateurs', href: route('admin.users.index'), icon: UsersIcon, current: 'admin.users.*' }]
+            : []),
+    ];
 
     return (
         <>
@@ -38,19 +41,13 @@ export default function Sidebar({ sidebarOpen, setSidebarOpen }) {
                     sidebarOpen ? 'translate-x-0' : '-translate-x-full'
                 }`}
             >
-                <div className="flex h-24 shrink-0 items-center justify-between border-b border-white/8 px-5">
-                    <Link href={route('dashboard')} className="flex items-center gap-3">
-                        <img src={logo} alt="EduCampus" className="h-12 w-auto object-contain" />
-                        <div>
-                            <p className="text-[15px] font-bold leading-tight text-white">EduCampus</p>
-                            <p className="mt-1 text-[11px] font-semibold uppercase tracking-[0.26em] text-emerald-300/80">
-                                Administration
-                            </p>
-                        </div>
+                <div className="relative flex h-24 shrink-0 items-center justify-center border-b border-white/8 px-5">
+                    <Link href={route('dashboard')} className="flex items-center justify-center">
+                        <img src={logo} alt="EduCampus" className="h-20 w-auto object-contain" />
                     </Link>
                     <button
                         onClick={() => setSidebarOpen(false)}
-                        className="rounded-xl p-2 text-slate-300 transition hover:bg-white/10 hover:text-white lg:hidden"
+                        className="absolute right-5 rounded-xl p-2 text-slate-300 transition hover:bg-white/10 hover:text-white lg:hidden"
                     >
                         <XMarkIcon className="h-6 w-6" />
                     </button>
@@ -63,7 +60,9 @@ export default function Sidebar({ sidebarOpen, setSidebarOpen }) {
 
                     <div className="space-y-2">
                         {navigation.map((item) => {
-                            const isActive = route().current(item.current);
+                            const isActive = Array.isArray(item.current)
+                                ? item.current.some((routeName) => route().current(routeName))
+                                : route().current(item.current);
                             return (
                                 <Link
                                     key={item.name}
@@ -94,6 +93,18 @@ export default function Sidebar({ sidebarOpen, setSidebarOpen }) {
                                 <p className="truncate text-sm font-semibold text-white">{user?.name}</p>
                                 <p className="truncate text-xs text-slate-300">{user?.email}</p>
                             </div>
+                            <Link
+                                href={route('profile.edit')}
+                                title="Paramètres du profil"
+                                aria-label="Paramètres du profil"
+                                className={`shrink-0 rounded-xl p-2 transition ${
+                                    route().current('profile.*')
+                                        ? 'bg-emerald-500/20 text-emerald-300'
+                                        : 'text-slate-300 hover:bg-white/10 hover:text-white'
+                                }`}
+                            >
+                                <Cog6ToothIcon className="h-5 w-5" />
+                            </Link>
                         </div>
 
                         <Link

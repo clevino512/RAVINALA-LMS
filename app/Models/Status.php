@@ -22,6 +22,6 @@ class Status extends Model
 
     public function users(): HasMany
     {
-        return $this->hasMany(User::class, 'id_status');
+        return $this->hasMany(User::class, 'id_2');
     }
 }

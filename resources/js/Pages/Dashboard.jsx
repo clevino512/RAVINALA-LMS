@@ -1,155 +1,94 @@
 import AppLayout from '@/Layouts/AppLayout';
-import { Head } from '@inertiajs/react';
+import { Head, Link } from '@inertiajs/react';
 import {
-    CubeIcon,
-    UserGroupIcon,
-    CurrencyDollarIcon,
-    ChartBarIcon,
+    AcademicCapIcon,
+    ArrowRightIcon,
+    CheckCircleIcon,
+    ClockIcon,
+    UserPlusIcon,
+    UsersIcon,
 } from '@heroicons/react/24/outline';
 
 const statConfig = [
-    { key: 'totalProducts', name: 'Total Produits', icon: CubeIcon, color: 'bg-primary-500' },
-    { key: 'totalClients', name: 'Total Clients', icon: UserGroupIcon, color: 'bg-accent-500' },
-    { key: 'totalRevenue', name: 'Revenus', icon: CurrencyDollarIcon, color: 'bg-yellow-500' },
-    { key: 'totalSales', name: 'Ventes', icon: ChartBarIcon, color: 'bg-purple-500' },
+    { key: 'totalUsers', name: 'Utilisateurs', icon: UsersIcon, color: 'bg-emerald-600' },
+    { key: 'totalCourses', name: 'Cours disponibles', icon: AcademicCapIcon, color: 'bg-blue-600' },
+    { key: 'activeUsers', name: 'Comptes actifs', icon: CheckCircleIcon, color: 'bg-teal-600' },
+    { key: 'newUsers', name: 'Nouveaux (30 jours)', icon: UserPlusIcon, color: 'bg-amber-500' },
 ];
 
-
-
-export default function Dashboard({ stats, recentActivities }) {
+export default function Dashboard({ stats, recentUsers }) {
     return (
         <AppLayout
             header={
                 <div>
-                    <h1 className="text-2xl font-bold text-dark-900">
-                        Dashboard
-                    </h1>
-                    <p className="mt-1 text-sm text-dark-500">
-                        Bienvenue sur votre tableau de bord
-                    </p>
+                    <h1 className="text-2xl font-bold text-slate-900">Dashboard</h1>
+                    <p className="mt-1 text-sm text-slate-500">Vue d’ensemble des utilisateurs et des cours.</p>
                 </div>
             }
         >
             <Head title="Dashboard" />
 
-            {/* Stats Grid */}
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
                 {statConfig.map((stat) => (
-                    <div key={stat.key} className="card">
-                        <div className="card-body flex items-center gap-4">
-                            <div
-                                className={`flex h-12 w-12 items-center justify-center rounded-xl ${stat.color}`}
-                            >
+                    <div key={stat.key} className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+                        <div className="flex items-center gap-4">
+                            <div className={`flex h-12 w-12 items-center justify-center rounded-xl ${stat.color}`}>
                                 <stat.icon className="h-6 w-6 text-white" />
                             </div>
                             <div>
-                                <p className="text-sm font-medium text-dark-500">
-                                    {stat.name}
-                                </p>
-                                <p className="text-2xl font-bold text-dark-900">
-                                    {stats[stat.key]}
-                                </p>
+                                <p className="text-sm font-medium text-slate-500">{stat.name}</p>
+                                <p className="mt-1 text-2xl font-bold text-slate-900">{stats[stat.key]}</p>
                             </div>
                         </div>
                     </div>
                 ))}
             </div>
 
-            {/* Quick Actions */}
-            <div className="mt-6 grid grid-cols-1 gap-4 lg:grid-cols-2">
-                <div className="card">
-                    <div className="card-header">
-                        <h2 className="text-lg font-semibold text-dark-900">
-                            Actions rapides
-                        </h2>
+            <div className="mt-6 grid gap-5 lg:grid-cols-[0.8fr,1.2fr]">
+                <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+                    <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-emerald-100 text-emerald-700">
+                        <UsersIcon className="h-6 w-6" />
                     </div>
-                    <div className="card-body space-y-3">
-                        <a
-                            href={route('admin.products.create')}
-                            className="flex items-center gap-3 rounded-lg border border-dark-200 p-3 transition-colors hover:bg-dark-50"
-                        >
-                            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary-100">
-                                <CubeIcon className="h-5 w-5 text-primary-600" />
-                            </div>
-                            <div>
-                                <p className="font-medium text-dark-900">
-                                    Ajouter un produit
-                                </p>
-                                <p className="text-sm text-dark-500">
-                                    Créer un nouveau produit
-                                </p>
-                            </div>
-                        </a>
-                        <a
-                            href={route('admin.clients.create')}
-                            className="flex items-center gap-3 rounded-lg border border-dark-200 p-3 transition-colors hover:bg-dark-50"
-                        >
-                            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-accent-100">
-                                <UserGroupIcon className="h-5 w-5 text-accent-600" />
-                            </div>
-                            <div>
-                                <p className="font-medium text-dark-900">
-                                    Ajouter un client
-                                </p>
-                                <p className="text-sm text-dark-500">
-                                    Enregistrer un nouveau client
-                                </p>
-                            </div>
-                        </a>
-                    </div>
-                </div>
+                    <h2 className="mt-5 text-xl font-bold text-slate-900">Gestion des utilisateurs</h2>
+                    <p className="mt-2 text-sm leading-6 text-slate-500">
+                        Ajoutez des comptes, attribuez leurs cours et contrôlez leur statut depuis un espace unique.
+                    </p>
+                    <Link href={route('admin.users.index')} className="mt-6 inline-flex items-center gap-2 rounded-xl bg-emerald-600 px-5 py-3 text-sm font-semibold text-white transition hover:bg-emerald-700">
+                        Gérer les utilisateurs
+                        <ArrowRightIcon className="h-4 w-4" />
+                    </Link>
+                </section>
 
-                <div className="card">
-                    <div className="card-header">
-                        <h2 className="text-lg font-semibold text-dark-900">
-                            Activité récente
-                        </h2>
+                <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+                    <div className="flex items-center justify-between border-b border-slate-100 px-6 py-5">
+                        <div>
+                            <h2 className="text-lg font-bold text-slate-900">Utilisateurs récents</h2>
+                            <p className="mt-1 text-sm text-slate-500">Les derniers comptes ajoutés à la plateforme.</p>
+                        </div>
+                        <ClockIcon className="h-6 w-6 text-slate-400" />
                     </div>
-                    <div className="card-body">
-                        {recentActivities && recentActivities.length > 0 ? (
-                            <ul className="space-y-3">
-                                {recentActivities.map((activity, index) => (
-                                    <li
-                                        key={index}
-                                        className="flex items-start gap-3 border-b border-dark-100 pb-3 last:border-0"
-                                    >
-                                        <div
-                                            className={`mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full ${
-                                                activity.type === 'product'
-                                                    ? 'bg-primary-100'
-                                                    : 'bg-accent-100'
-                                            }`}
-                                        >
-                                            {activity.type === 'product' ? (
-                                                <CubeIcon className="h-4 w-4 text-primary-600" />
-                                            ) : (
-                                                <UserGroupIcon className="h-4 w-4 text-accent-600" />
-                                            )}
-                                        </div>
-                                        <div>
-                                            <p className="text-sm text-dark-900">
-                                                {activity.message}
-                                            </p>
-                                            <p className="text-xs text-dark-400">
-                                                {new Date(activity.date).toLocaleDateString('fr-FR', {
-                                                    day: 'numeric',
-                                                    month: 'long',
-                                                    year: 'numeric',
-                                                    hour: '2-digit',
-                                                    minute: '2-digit',
-                                                })}
-                                            </p>
-                                        </div>
-                                    </li>
-                                ))}
-                            </ul>
-                        ) : (
-                            <p className="text-sm text-dark-500">
-                                Aucune activité récente à afficher.
-                            </p>
+                    <div className="divide-y divide-slate-100">
+                        {recentUsers?.length > 0 ? recentUsers.map((user) => (
+                            <Link key={user.id} href={route('admin.users.show', user.id)} className="flex items-center gap-4 px-6 py-4 transition hover:bg-emerald-50/40">
+                                <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-emerald-100 font-bold text-emerald-700">
+                                    {user.first_name?.charAt(0)?.toUpperCase()}
+                                </div>
+                                <div className="min-w-0 flex-1">
+                                    <p className="truncate font-semibold text-slate-900">{user.name}</p>
+                                    <p className="truncate text-sm text-slate-500">{user.email || 'E-mail non renseigné'}</p>
+                                </div>
+                                <div className="text-right">
+                                    <p className="text-xs font-semibold text-slate-600">{user.user_type?.name || '-'}</p>
+                                    <p className="mt-1 text-xs text-slate-400">
+                                        {user.created_at ? new Date(user.created_at).toLocaleDateString('fr-FR') : '-'}
+                                    </p>
+                                </div>
+                            </Link>
+                        )) : (
+                            <p className="px-6 py-12 text-center text-sm text-slate-500">Aucun utilisateur récent.</p>
                         )}
                     </div>
-                </div>
+                </section>
             </div>
         </AppLayout>
     );

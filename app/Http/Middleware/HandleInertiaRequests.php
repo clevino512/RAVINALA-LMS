@@ -2,7 +2,6 @@
 
 namespace App\Http\Middleware;
 
-use Illuminate\Database\QueryException;
 use Illuminate\Http\Request;
 use Inertia\Middleware;
 
@@ -32,16 +31,12 @@ class HandleInertiaRequests extends Middleware
     {
         $user = $request->user();
         $roles = [];
-        $permissions = [];
+        $courses = [];
 
         if ($user) {
-            try {
-                $roles = $user->getRoleNames();
-                $permissions = $user->getAllPermissions()->pluck('name');
-            } catch (QueryException) {
-                $roles = collect();
-                $permissions = collect();
-            }
+            $user->loadMissing(['userType', 'courses']);
+            $roles = collect([$user->userType?->name])->filter()->values();
+            $courses = $user->courses->pluck('name');
         }
 
         return [
@@ -49,7 +44,7 @@ class HandleInertiaRequests extends Middleware
             'auth' => [
                 'user' => $user,
                 'roles' => $roles,
-                'permissions' => $permissions,
+                'courses' => $courses,
             ],
             'flash' => [
                 'success' => fn () => $request->session()->get('success'),

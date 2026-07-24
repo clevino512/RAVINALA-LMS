@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
+use App\Models\Course;
 use App\Models\Status;
 use App\Models\User;
 use App\Models\UserType;
@@ -29,7 +30,7 @@ class UserController extends Controller
             $perPage = 10;
         }
 
-        $users = User::with(['userType', 'status'])
+        $users = User::with(['userType', 'status', 'courses'])
             ->when($search !== '', function ($query) use ($search) {
                 $query->where(function ($innerQuery) use ($search) {
                     $innerQuery
@@ -39,8 +40,8 @@ class UserController extends Controller
                         ->orWhere('email', 'like', "%{$search}%");
                 });
             })
-            ->when($type !== '', fn ($query) => $query->where('id_type', $type))
-            ->when($status !== '', fn ($query) => $query->where('id_status', $status))
+            ->when($type !== '', fn ($query) => $query->where('id_1', $type))
+            ->when($status !== '', fn ($query) => $query->where('id_2', $status))
             ->latest()
             ->paginate($perPage)
             ->withQueryString();
@@ -49,6 +50,7 @@ class UserController extends Controller
             'users' => $users,
             'userTypes' => UserType::orderBy('name')->get(),
             'statuses' => Status::orderBy('name')->get(),
+            'courses' => Course::orderBy('name')->get(),
             'filters' => [
                 'search' => $search,
                 'type' => $type,
@@ -61,15 +63,17 @@ class UserController extends Controller
     public function store(Request $request): RedirectResponse
     {
         $validated = $request->validate($this->rules());
-        $validated['name'] = $this->buildDisplayName($validated['first_name'], $validated['last_name'] ?? null);
+        $courseIds = $this->resolveCourseIds($validated);
+        unset($validated['course_ids']);
         $validated['password'] = Hash::make($validated['password']);
-        $validated['must_change_password'] = true;
+        $validated['must_change_password'] = $this->requiresInitialPasswordChange($validated['id_1']);
 
         if ($request->hasFile('profile_picture')) {
             $validated['profile_picture'] = $this->storeProfilePicture($request);
         }
 
-        User::create($validated);
+        $user = User::create($validated);
+        $user->courses()->sync($courseIds);
 
         return redirect()->route('admin.users.index')->with(
             'success',
@@ -77,10 +81,20 @@ class UserController extends Controller
         );
     }
 
+    public function show(User $user): Response
+    {
+        $user->load(['userType', 'status', 'courses']);
+
+        return Inertia::render('Admin/Users/Show', [
+            'user' => $user,
+        ]);
+    }
+
     public function update(Request $request, User $user): RedirectResponse
     {
         $validated = $request->validate($this->rules($user));
-        $validated['name'] = $this->buildDisplayName($validated['first_name'], $validated['last_name'] ?? null);
+        $courseIds = $this->resolveCourseIds($validated);
+        unset($validated['course_ids']);
 
         if ($request->hasFile('profile_picture')) {
             $this->deleteStoredProfilePicture($user->profile_picture);
@@ -93,10 +107,11 @@ class UserController extends Controller
             unset($validated['password']);
         } else {
             $validated['password'] = Hash::make($validated['password']);
-            $validated['must_change_password'] = true;
+            $validated['must_change_password'] = $this->requiresInitialPasswordChange($validated['id_1']);
         }
 
         $user->update($validated);
+        $user->courses()->sync($courseIds);
 
         return redirect()->route('admin.users.index')->with('success', 'Compte modifie.');
     }
@@ -116,19 +131,40 @@ class UserController extends Controller
         return [
             'first_name' => ['required', 'string', 'max:250'],
             'last_name' => ['nullable', 'string', 'max:250'],
-            'email' => ['required', 'email', 'max:200', Rule::unique(User::class)->ignore($user?->id)],
+            'email' => ['nullable', 'email', 'max:200', Rule::unique(User::class)->ignore($user?->id)],
             'date_of_birth' => ['nullable', 'date', 'before:today'],
+            'sex' => ['nullable', Rule::in(['homme', 'femme', 'autre'])],
             'phone_number' => ['nullable', 'string', 'max:50'],
             'profile_picture' => ['nullable', 'image', 'mimes:jpg,jpeg,png,webp', 'max:2048'],
             'password' => [$user ? 'nullable' : 'required', 'confirmed', Password::defaults()],
-            'id_type' => ['required', 'exists:user_type,id'],
-            'id_status' => ['required', 'exists:status,id'],
+            'id_1' => ['required', 'exists:user_type,id'],
+            'id_2' => ['required', 'exists:status,id'],
+            'course_ids' => ['nullable', 'array'],
+            'course_ids.*' => ['integer', 'distinct', 'exists:courses,id'],
         ];
     }
 
-    private function buildDisplayName(string $firstName, ?string $lastName): string
+    private function resolveCourseIds(array $validated): array
     {
-        return trim($firstName.' '.($lastName ?? ''));
+        $userType = UserType::find($validated['id_1']);
+        $isAdministrator = in_array(
+            mb_strtolower((string) $userType?->name),
+            ['admin', 'administrateur'],
+            true,
+        );
+
+        if ($isAdministrator) {
+            return Course::pluck('id')->all();
+        }
+
+        return $validated['course_ids'] ?? [];
+    }
+
+    private function requiresInitialPasswordChange(int|string $userTypeId): bool
+    {
+        $typeName = mb_strtolower((string) UserType::find($userTypeId)?->name);
+
+        return in_array($typeName, ['étudiant', 'etudiant', 'student', 'professeur', 'teacher'], true);
     }
 
     private function storeProfilePicture(Request $request): string

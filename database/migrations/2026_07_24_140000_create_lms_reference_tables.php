@@ -10,15 +10,16 @@ return new class extends Migration
     {
         Schema::create('status', function (Blueprint $table) {
             $table->id();
-            $table->string('name')->unique();
-            $table->timestamp('created_at')->nullable();
+            $table->string('name', 50)->nullable();
+            $table->string('created_at', 50)->nullable();
         });
 
         Schema::create('user_type', function (Blueprint $table) {
             $table->id();
-            $table->string('name')->unique();
-            $table->string('description')->nullable();
-            $table->timestamps();
+            $table->string('name', 50)->nullable();
+            $table->text('description')->nullable();
+            $table->dateTime('created_at')->nullable();
+            $table->string('updated_at', 50)->nullable();
         });
     }
 

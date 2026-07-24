@@ -30,7 +30,7 @@ Route::middleware(['auth', 'verified', 'password.changed'])->group(function () {
         ->name('admin.dashboard');
 
     Route::resource('/admin/users', AdminUserController::class)
-        ->only(['index', 'store', 'update', 'destroy'])
+        ->only(['index', 'show', 'store', 'update', 'destroy'])
         ->middleware('user.type:admin,administrateur')
         ->names('admin.users');
 
@@ -40,7 +40,7 @@ Route::middleware(['auth', 'verified', 'password.changed'])->group(function () {
     });
 
     Route::get('/etudiant/dashboard', [EtudiantDashboardController::class, 'index'])
-        ->middleware('user.type:étudiant,etudiant,student')
+        ->middleware('user.type:Ã©tudiant,etudiant,student')
         ->name('etudiant.dashboard');
 
     Route::get('/professeur/dashboard', [ProfesseurDashboardController::class, 'index'])

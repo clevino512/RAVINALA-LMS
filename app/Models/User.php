@@ -9,12 +9,11 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
-use Spatie\Permission\Traits\HasRoles;
 
 class User extends Authenticatable
 {
     /** @use HasFactory<UserFactory> */
-    use HasFactory, Notifiable, HasRoles;
+    use HasFactory, Notifiable;
 
     /**
      * The attributes that are mass assignable.
@@ -22,19 +21,19 @@ class User extends Authenticatable
      * @var list<string>
      */
     protected $fillable = [
-        'name',
         'first_name',
         'last_name',
         'email',
         'email_verified_at',
         'date_of_birth',
+        'sex',
         'phone_number',
         'profile_picture',
         'password',
         'must_change_password',
         'last_login_at',
-        'id_type',
-        'id_status',
+        'id_1',
+        'id_2',
     ];
 
     /**
@@ -59,7 +58,7 @@ class User extends Authenticatable
     {
         return [
             'email_verified_at' => 'datetime',
-            'date_of_birth' => 'date',
+            'date_of_birth' => 'date:Y-m-d',
             'last_login_at' => 'datetime',
             'created_at' => 'datetime',
             'updated_at' => 'datetime',
@@ -75,17 +74,22 @@ class User extends Authenticatable
 
     public function userType(): BelongsTo
     {
-        return $this->belongsTo(UserType::class, 'id_type');
+        return $this->belongsTo(UserType::class, 'id_1');
     }
 
     public function status(): BelongsTo
     {
-        return $this->belongsTo(Status::class, 'id_status');
+        return $this->belongsTo(Status::class, 'id_2');
     }
 
     public function customPermissions(): BelongsToMany
     {
         return $this->belongsToMany(Permission::class, 'user_permissions', 'users_id', 'permissions_id');
+    }
+
+    public function courses(): BelongsToMany
+    {
+        return $this->belongsToMany(Course::class);
     }
 
     public function hasUserType(string $type): bool

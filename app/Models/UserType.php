@@ -18,6 +18,6 @@ class UserType extends Model
 
     public function users(): HasMany
     {
-        return $this->hasMany(User::class, 'id_type');
+        return $this->hasMany(User::class, 'id_1');
     }
 }

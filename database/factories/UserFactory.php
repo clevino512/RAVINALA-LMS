@@ -30,11 +30,11 @@ class UserFactory extends Factory
         $lastName = fake()->lastName();
 
         return [
-            'name' => trim($firstName.' '.$lastName),
             'first_name' => $firstName,
             'last_name' => $lastName,
             'email' => fake()->unique()->safeEmail(),
             'date_of_birth' => fake()->dateTimeBetween('-60 years', '-18 years')->format('Y-m-d'),
+            'sex' => fake()->randomElement(['homme', 'femme', 'autre']),
             'phone_number' => fake()->phoneNumber(),
             'profile_picture' => null,
             'email_verified_at' => now(),
@@ -42,8 +42,8 @@ class UserFactory extends Factory
             'must_change_password' => true,
             'last_login_at' => null,
             'remember_token' => Str::random(10),
-            'id_type' => UserType::factory(),
-            'id_status' => Status::factory(),
+            'id_1' => UserType::factory(),
+            'id_2' => Status::factory(),
         ];
     }
 

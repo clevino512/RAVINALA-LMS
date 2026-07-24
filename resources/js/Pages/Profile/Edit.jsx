@@ -1,7 +1,6 @@
 import AppLayout from '@/Layouts/AppLayout';
 import { Head } from '@inertiajs/react';
 import DeleteUserForm from './Partials/DeleteUserForm';
-import UpdatePasswordForm from './Partials/UpdatePasswordForm';
 import UpdateProfileInformationForm from './Partials/UpdateProfileInformationForm';
 
 export default function Edit({ mustVerifyEmail, status }) {
@@ -27,12 +26,6 @@ export default function Edit({ mustVerifyEmail, status }) {
                             mustVerifyEmail={mustVerifyEmail}
                             status={status}
                         />
-                    </div>
-                </div>
-
-                <div className="card">
-                    <div className="card-body">
-                        <UpdatePasswordForm />
                     </div>
                 </div>
 

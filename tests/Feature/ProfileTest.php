@@ -4,6 +4,7 @@ namespace Tests\Feature;
 
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Hash;
 use Tests\TestCase;
 
 class ProfileTest extends TestCase
@@ -12,7 +13,7 @@ class ProfileTest extends TestCase
 
     public function test_profile_page_is_displayed(): void
     {
-        $user = User::factory()->create();
+        $user = User::factory()->create(['must_change_password' => false]);
 
         $response = $this
             ->actingAs($user)
@@ -23,12 +24,13 @@ class ProfileTest extends TestCase
 
     public function test_profile_information_can_be_updated(): void
     {
-        $user = User::factory()->create();
+        $user = User::factory()->create(['must_change_password' => false]);
 
         $response = $this
             ->actingAs($user)
             ->patch('/profile', [
-                'name' => 'Test User',
+                'first_name' => 'Test',
+                'last_name' => 'User',
                 'email' => 'test@example.com',
             ]);
 
@@ -45,12 +47,13 @@ class ProfileTest extends TestCase
 
     public function test_email_verification_status_is_unchanged_when_the_email_address_is_unchanged(): void
     {
-        $user = User::factory()->create();
+        $user = User::factory()->create(['must_change_password' => false]);
 
         $response = $this
             ->actingAs($user)
             ->patch('/profile', [
-                'name' => 'Test User',
+                'first_name' => 'Test',
+                'last_name' => 'User',
                 'email' => $user->email,
             ]);
 
@@ -59,6 +62,36 @@ class ProfileTest extends TestCase
             ->assertRedirect('/profile');
 
         $this->assertNotNull($user->refresh()->email_verified_at);
+    }
+
+    public function test_profile_information_and_password_can_be_updated_together(): void
+    {
+        $user = User::factory()->create(['must_change_password' => true]);
+
+        $response = $this
+            ->actingAs($user)
+            ->patch('/profile', [
+                'first_name' => 'Ravo',
+                'last_name' => 'Tiana',
+                'email' => 'ravotina3@gmail.com',
+                'phone_number' => '13211315656',
+                'date_of_birth' => '2000-01-01',
+                'current_password' => 'password',
+                'password' => 'nouveau-password',
+                'password_confirmation' => 'nouveau-password',
+            ]);
+
+        $response
+            ->assertSessionHasNoErrors()
+            ->assertSessionHas('success')
+            ->assertRedirect(route('dashboard'));
+
+        $user->refresh();
+
+        $this->assertSame('Ravo Tiana', $user->name);
+        $this->assertSame('13211315656', $user->phone_number);
+        $this->assertTrue(Hash::check('nouveau-password', $user->password));
+        $this->assertFalse($user->must_change_password);
     }
 
     public function test_user_can_delete_their_account(): void
