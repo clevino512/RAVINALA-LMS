@@ -2,6 +2,7 @@
 
 namespace App\Http\Middleware;
 
+use Illuminate\Database\QueryException;
 use Illuminate\Http\Request;
 use Inertia\Middleware;
 
@@ -30,13 +31,25 @@ class HandleInertiaRequests extends Middleware
     public function share(Request $request): array
     {
         $user = $request->user();
+        $roles = [];
+        $permissions = [];
+
+        if ($user) {
+            try {
+                $roles = $user->getRoleNames();
+                $permissions = $user->getAllPermissions()->pluck('name');
+            } catch (QueryException) {
+                $roles = collect();
+                $permissions = collect();
+            }
+        }
 
         return [
             ...parent::share($request),
             'auth' => [
                 'user' => $user,
-                'roles' => $user?->getRoleNames() ?? [],
-                'permissions' => $user?->getAllPermissions()->pluck('name') ?? [],
+                'roles' => $roles,
+                'permissions' => $permissions,
             ],
             'flash' => [
                 'success' => fn () => $request->session()->get('success'),
