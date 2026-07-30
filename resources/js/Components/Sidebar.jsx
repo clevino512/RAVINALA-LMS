@@ -1,6 +1,7 @@
 import { Link, usePage } from '@inertiajs/react';
 import {
     ArrowRightOnRectangleIcon,
+    BookOpenIcon,
     Cog6ToothIcon,
     HomeIcon,
     UsersIcon,
@@ -23,7 +24,10 @@ export default function Sidebar({ sidebarOpen, setSidebarOpen }) {
             current: ['dashboard', 'admin.dashboard', 'professeur.dashboard', 'etudiant.dashboard'],
         },
         ...(isAdministrator
-            ? [{ name: 'Utilisateurs', href: route('admin.users.index'), icon: UsersIcon, current: 'admin.users.*' }]
+            ? [
+                { name: 'Utilisateurs', href: route('admin.users.index'), icon: UsersIcon, current: 'admin.users.*' },
+                { name: 'Cours', href: route('admin.lms.management'), icon: BookOpenIcon, current: 'admin.lms.*' },
+            ]
             : []),
     ];
 
@@ -95,8 +99,8 @@ export default function Sidebar({ sidebarOpen, setSidebarOpen }) {
                             </div>
                             <Link
                                 href={route('profile.edit')}
-                                title="Paramètres du profil"
-                                aria-label="Paramètres du profil"
+                                title="Parametres du profil"
+                                aria-label="Parametres du profil"
                                 className={`shrink-0 rounded-xl p-2 transition ${
                                     route().current('profile.*')
                                         ? 'bg-emerald-500/20 text-emerald-300'
