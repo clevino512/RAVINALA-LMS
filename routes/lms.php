@@ -23,6 +23,7 @@ Route::middleware(['auth', 'verified', 'password.changed', 'user.type:admin,admi
         Route::post('courses/{course}/modules/{module}/lessons', [LessonController::class, 'store'])->name('courses.modules.lessons.store');
         Route::get('courses/{course}/modules/{module}/lessons/{lesson}', [LessonController::class, 'show'])->name('courses.modules.lessons.show');
         Route::patch('courses/{course}/modules/{module}/lessons/{lesson}/publication', [LessonController::class, 'updatePublication'])->name('courses.modules.lessons.publication');
+        Route::delete('courses/{course}/modules/{module}/lessons/{lesson}/files/{lessonFile}', [LessonController::class, 'destroyFile'])->name('courses.modules.lessons.files.destroy');
         Route::match(['put', 'patch'], 'courses/{course}/modules/{module}/lessons/{lesson}', [LessonController::class, 'update'])->name('courses.modules.lessons.update');
         Route::delete('courses/{course}/modules/{module}/lessons/{lesson}', [LessonController::class, 'destroy'])->name('courses.modules.lessons.destroy');
     });

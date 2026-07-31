@@ -19,7 +19,7 @@ class CourseManagementController extends Controller
             ->get()
             ->map(function (Course $course) {
                 $modules = CourseModule::query()
-                    ->with('lessons.lessonType')
+                    ->with(['lessons.lessonType', 'lessons.files'])
                     ->where('course_id', $course->id)
                     ->orderBy('position')
                     ->get()
@@ -46,6 +46,14 @@ class CourseManagementController extends Controller
                                     'id' => $lesson->lessonType->id,
                                     'name' => $lesson->lessonType->name,
                                 ] : null,
+                                'files' => $lesson->files->map(fn ($file) => [
+                                    'id' => $file->id,
+                                    'file_path' => $file->file_path,
+                                    'original_name' => $file->original_name,
+                                    'mime_type' => $file->mime_type,
+                                    'file_size' => $file->file_size,
+                                    'position' => $file->position,
+                                ])->values(),
                             ])->values(),
                         ];
                     })

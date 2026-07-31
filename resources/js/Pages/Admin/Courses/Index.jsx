@@ -11,6 +11,7 @@ import axios from 'axios';
 import {
     ArrowDownTrayIcon,
     BookOpenIcon,
+    ChevronLeftIcon,
     ChevronRightIcon,
     ClipboardDocumentListIcon,
     ClockIcon,
@@ -37,8 +38,8 @@ const emptyModuleForm = {
 const emptyLessonForm = {
     title: '',
     description: '',
-    lesson_file: null,
-    existing_file_path: '',
+    lesson_files: [],
+    deleted_file_ids: [],
     duration: '',
     position: '',
     is_published: false,
@@ -157,6 +158,93 @@ function MediaPreview({ source, mimeType = '', className = '' }) {
     );
 }
 
+function LessonFilesCarousel({ files }) {
+    const carouselRef = useRef(null);
+    const [activeIndex, setActiveIndex] = useState(0);
+
+    useEffect(() => {
+        setActiveIndex((current) => Math.min(current, Math.max(files.length - 1, 0)));
+    }, [files.length]);
+
+    const scrollToFile = (nextIndex) => {
+        const safeIndex = Math.max(0, Math.min(nextIndex, files.length - 1));
+        const container = carouselRef.current;
+
+        if (!container) return;
+
+        container.scrollTo({
+            left: safeIndex * container.clientWidth,
+            behavior: 'smooth',
+        });
+        setActiveIndex(safeIndex);
+    };
+
+    const handleScroll = () => {
+        const container = carouselRef.current;
+        if (!container?.clientWidth) return;
+
+        setActiveIndex(Math.round(container.scrollLeft / container.clientWidth));
+    };
+
+    if (!files?.length) {
+        return (
+            <div className="flex min-h-36 items-center justify-center rounded-2xl border border-dashed border-slate-200 bg-slate-50 text-sm text-slate-400">
+                Aucun fichier
+            </div>
+        );
+    }
+
+    return (
+        <div className="relative">
+            <div className="mb-2 flex items-center justify-between gap-3">
+                <span className="text-xs font-semibold text-slate-500">
+                    Fichier {activeIndex + 1} sur {files.length}
+                </span>
+                {files.length > 1 && (
+                    <div className="flex gap-2">
+                        <button
+                            type="button"
+                            onClick={() => scrollToFile(activeIndex - 1)}
+                            disabled={activeIndex === 0}
+                            className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-700 shadow-sm hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40"
+                            aria-label="Fichier précédent"
+                        >
+                            <ChevronLeftIcon className="h-5 w-5" />
+                        </button>
+                        <button
+                            type="button"
+                            onClick={() => scrollToFile(activeIndex + 1)}
+                            disabled={activeIndex === files.length - 1}
+                            className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-700 shadow-sm hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40"
+                            aria-label="Fichier suivant"
+                        >
+                            <ChevronRightIcon className="h-5 w-5" />
+                        </button>
+                    </div>
+                )}
+            </div>
+            <div
+                ref={carouselRef}
+                onScroll={handleScroll}
+                className="flex snap-x snap-mandatory overflow-x-auto scroll-smooth [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+            >
+                {files.map((lessonFile) => (
+                    <div key={lessonFile.id} className="w-full min-w-full snap-start">
+                        <p className="mb-1 truncate text-xs font-medium text-slate-500">
+                            {lessonFile.original_name}
+                        </p>
+                        <MediaPreview
+                            source={lessonFile.file_path}
+                            mimeType={lessonFile.mime_type ?? ''}
+                            className="w-full"
+                        />
+                    </div>
+                ))}
+            </div>
+        </div>
+    );
+}
+
 export default function Index({ courses, lessonTypes }) {
     const [selectedCourseId, setSelectedCourseId] = useState(courses[0]?.id ?? null);
     const [selectedModuleId, setSelectedModuleId] = useState(courses[0]?.modules?.[0]?.id ?? null);
@@ -176,7 +264,7 @@ export default function Index({ courses, lessonTypes }) {
     const [confirmState, setConfirmState] = useState({ title: '', message: '', onConfirm: null });
     const [processing, setProcessing] = useState(false);
     const [feedback, setFeedback] = useState(null);
-    const [lessonFilePreview, setLessonFilePreview] = useState(null);
+    const [lessonFilePreviews, setLessonFilePreviews] = useState([]);
     const [lessonMenuId, setLessonMenuId] = useState(null);
     const [publishingLessonId, setPublishingLessonId] = useState(null);
 
@@ -188,6 +276,25 @@ export default function Index({ courses, lessonTypes }) {
     const selectedModule = useMemo(
         () => selectedCourse?.modules?.find((module) => module.id === selectedModuleId) ?? null,
         [selectedCourse, selectedModuleId],
+    );
+
+    const editingLesson = useMemo(
+        () => selectedModule?.lessons?.find((lesson) => lesson.id === lessonAction.item?.id) ?? lessonAction.item,
+        [selectedModule, lessonAction.item],
+    );
+
+    const visibleEditingFiles = useMemo(
+        () => (editingLesson?.files ?? []).filter(
+            (file) => !lessonForm.deleted_file_ids.includes(file.id),
+        ),
+        [editingLesson, lessonForm.deleted_file_ids],
+    );
+
+    const deletedEditingFiles = useMemo(
+        () => (editingLesson?.files ?? []).filter(
+            (file) => lessonForm.deleted_file_ids.includes(file.id),
+        ),
+        [editingLesson, lessonForm.deleted_file_ids],
     );
 
     const stats = useMemo(() => ({
@@ -233,16 +340,19 @@ export default function Index({ courses, lessonTypes }) {
     }, [feedback]);
 
     useEffect(() => {
-        if (!(lessonForm.lesson_file instanceof File)) {
-            setLessonFilePreview(null);
+        if (!lessonForm.lesson_files.length) {
+            setLessonFilePreviews([]);
             return undefined;
         }
 
-        const objectUrl = URL.createObjectURL(lessonForm.lesson_file);
-        setLessonFilePreview(objectUrl);
+        const previews = lessonForm.lesson_files.map((file) => ({
+            file,
+            url: URL.createObjectURL(file),
+        }));
+        setLessonFilePreviews(previews);
 
-        return () => URL.revokeObjectURL(objectUrl);
-    }, [lessonForm.lesson_file]);
+        return () => previews.forEach((preview) => URL.revokeObjectURL(preview.url));
+    }, [lessonForm.lesson_files]);
 
     const closeCourseModal = () => {
         setCourseModalOpen(false);
@@ -329,8 +439,8 @@ export default function Index({ courses, lessonTypes }) {
         setLessonForm({
             title: lesson.title ?? '',
             description: lesson.description ?? '',
-            lesson_file: null,
-            existing_file_path: lesson.file_path ?? '',
+            lesson_files: [],
+            deleted_file_ids: [],
             duration: lesson.duration ?? '',
             position: String(lesson.position ?? ''),
             is_published: Boolean(lesson.is_published),
@@ -341,20 +451,47 @@ export default function Index({ courses, lessonTypes }) {
     };
 
     const handleLessonFileChange = (event) => {
-        const file = event.target.files?.[0] ?? null;
+        const input = event.target;
+        const newFiles = Array.from(input.files ?? []);
+        const oversizedFile = newFiles.find((file) => file.size > maxLessonFileSize);
 
-        if (file && file.size > maxLessonFileSize) {
-            event.target.value = '';
-            setLessonForm((current) => ({ ...current, lesson_file: null }));
+        if (oversizedFile) {
+            input.value = '';
             setLessonErrors((current) => ({
                 ...current,
-                lesson_file: ['La taille de la vidéo ou du fichier ne doit pas dépasser 500 Mo.'],
+                lesson_files: [`Le fichier "${oversizedFile.name}" dépasse la taille maximale de 500 Mo.`],
             }));
             return;
         }
 
-        setLessonErrors((current) => ({ ...current, lesson_file: undefined }));
-        setLessonForm((current) => ({ ...current, lesson_file: file }));
+        const existingKeys = new Set(
+            lessonForm.lesson_files.map((file) => `${file.name}-${file.size}-${file.lastModified}`),
+        );
+        const uniqueNewFiles = newFiles.filter(
+            (file) => !existingKeys.has(`${file.name}-${file.size}-${file.lastModified}`),
+        );
+        const combinedFiles = [...lessonForm.lesson_files, ...uniqueNewFiles];
+
+        if (combinedFiles.length > 4) {
+            setLessonErrors((errors) => ({
+                ...errors,
+                lesson_files: ['Vous pouvez envoyer au maximum 4 fichiers à la fois. Retirez un fichier avant d’en ajouter un autre.'],
+            }));
+            input.value = '';
+            return;
+        }
+
+        setLessonErrors((errors) => ({ ...errors, lesson_files: undefined }));
+        setLessonForm((current) => ({ ...current, lesson_files: combinedFiles }));
+
+        input.value = '';
+    };
+
+    const removePendingLessonFile = (fileToRemove) => {
+        setLessonForm((current) => ({
+            ...current,
+            lesson_files: current.lesson_files.filter((file) => file !== fileToRemove),
+        }));
     };
 
     const submitCourse = async (event) => {
@@ -428,11 +565,8 @@ export default function Index({ courses, lessonTypes }) {
             payload.append('position', String(Number(lessonForm.position)));
             payload.append('lesson_type_id', String(Number(lessonForm.lesson_type_id)));
             payload.append('is_published', lessonForm.is_published ? '1' : '0');
-            payload.append('existing_file_path', lessonForm.existing_file_path || '');
-
-            if (lessonForm.lesson_file instanceof File) {
-                payload.append('lesson_file', lessonForm.lesson_file);
-            }
+            lessonForm.lesson_files.forEach((file) => payload.append('lesson_files[]', file));
+            lessonForm.deleted_file_ids.forEach((fileId) => payload.append('deleted_file_ids[]', String(fileId)));
 
             const response = lessonAction.mode === 'edit' && lessonAction.item
                 ? await axios.post(
@@ -491,6 +625,20 @@ export default function Index({ courses, lessonTypes }) {
         } finally {
             setPublishingLessonId(null);
         }
+    };
+
+    const askDeleteLessonFile = (lessonFile) => {
+        setLessonForm((current) => ({
+            ...current,
+            deleted_file_ids: [...new Set([...current.deleted_file_ids, lessonFile.id])],
+        }));
+    };
+
+    const restoreLessonFile = (fileId) => {
+        setLessonForm((current) => ({
+            ...current,
+            deleted_file_ids: current.deleted_file_ids.filter((id) => id !== fileId),
+        }));
     };
 
     const askDeleteCourse = (course) => {
@@ -687,10 +835,10 @@ export default function Index({ courses, lessonTypes }) {
                 </form>
             </Modal>
 
-            <Modal show={lessonModalOpen} onClose={closeLessonModal} maxWidth="2xl">
-                <form onSubmit={submitLesson} className="space-y-5 p-6">
-                    <div>
-                        <h2 className="text-xl font-semibold text-dark-900">
+            <Modal show={lessonModalOpen} onClose={closeLessonModal} maxWidth="6xl">
+                <form onSubmit={submitLesson} className="flex max-h-[92vh] flex-col">
+                    <div className="shrink-0 border-b border-dark-100 px-6 py-5">
+                        <h2 className="text-2xl font-bold text-dark-900">
                             {lessonAction.mode === 'edit' ? 'Modifier la leçon' : 'Ajouter une leçon'}
                         </h2>
                         <p className="mt-1 text-sm text-dark-500">
@@ -698,94 +846,163 @@ export default function Index({ courses, lessonTypes }) {
                         </p>
                     </div>
 
-                    <div className="grid gap-4 sm:grid-cols-2">
-                        <FormInput
-                            label="Titre de la leçon"
-                            name="title"
-                            value={lessonForm.title}
-                            onChange={(event) => setLessonForm((current) => ({ ...current, title: event.target.value }))}
-                            error={lessonErrors.title}
-                            required
-                        />
-                        <FormSelect
-                            label="Type de leçon"
-                            name="lesson_type_id"
-                            value={lessonForm.lesson_type_id}
-                            onChange={(event) => setLessonForm((current) => ({ ...current, lesson_type_id: event.target.value }))}
-                            error={lessonErrors.lesson_type_id}
-                            required
-                        >
-                            <option value="">Sélectionner</option>
-                            {lessonTypes.map((type) => (
-                                <option key={type.id} value={type.id}>{type.name}</option>
-                            ))}
-                        </FormSelect>
-                        <FormInput
-                            label="Position"
-                            name="position"
-                            type="number"
-                            value={lessonForm.position}
-                            onChange={(event) => setLessonForm((current) => ({ ...current, position: event.target.value }))}
-                            error={lessonErrors.position}
-                            required
-                        />
-                        <FormInput
-                            label="Durée (minutes)"
-                            name="duration"
-                            type="number"
-                            value={lessonForm.duration}
-                            onChange={(event) => setLessonForm((current) => ({ ...current, duration: event.target.value }))}
-                            error={lessonErrors.duration}
-                        />
+                    <div className="grid min-h-0 flex-1 overflow-y-auto lg:grid-cols-[minmax(0,0.85fr)_minmax(0,1.15fr)]">
+                        <div className="space-y-5 border-b border-dark-100 p-6 lg:border-b-0 lg:border-r">
+                            <div>
+                                <h3 className="font-semibold text-dark-900">Informations de la leçon</h3>
+                                <p className="mt-1 text-xs text-dark-500">Renseignez les informations pédagogiques principales.</p>
+                            </div>
+                            <FormInput
+                                label="Titre de la leçon"
+                                name="title"
+                                value={lessonForm.title}
+                                onChange={(event) => setLessonForm((current) => ({ ...current, title: event.target.value }))}
+                                error={lessonErrors.title}
+                                required
+                            />
+                            <div className="grid gap-4 sm:grid-cols-2">
+                                <FormSelect
+                                    label="Type de leçon"
+                                    name="lesson_type_id"
+                                    value={lessonForm.lesson_type_id}
+                                    onChange={(event) => setLessonForm((current) => ({ ...current, lesson_type_id: event.target.value }))}
+                                    error={lessonErrors.lesson_type_id}
+                                    required
+                                >
+                                    <option value="">Sélectionner</option>
+                                    {lessonTypes.map((type) => (
+                                        <option key={type.id} value={type.id}>{type.name}</option>
+                                    ))}
+                                </FormSelect>
+                                <FormInput
+                                    label="Position"
+                                    name="position"
+                                    type="number"
+                                    value={lessonForm.position}
+                                    onChange={(event) => setLessonForm((current) => ({ ...current, position: event.target.value }))}
+                                    error={lessonErrors.position}
+                                    required
+                                />
+                            </div>
+                            <FormInput
+                                label="Durée (minutes)"
+                                name="duration"
+                                type="number"
+                                value={lessonForm.duration}
+                                onChange={(event) => setLessonForm((current) => ({ ...current, duration: event.target.value }))}
+                                error={lessonErrors.duration}
+                            />
+                            <FormTextarea
+                                label="Description"
+                                name="description"
+                                value={lessonForm.description}
+                                onChange={(event) => setLessonForm((current) => ({ ...current, description: event.target.value }))}
+                                error={lessonErrors.description}
+                                rows={5}
+                            />
+                            <label className="flex items-center gap-3 rounded-xl border border-dark-200 bg-dark-50 px-4 py-3 text-sm text-dark-700">
+                                <input
+                                    type="checkbox"
+                                    checked={lessonForm.is_published}
+                                    onChange={(event) => setLessonForm((current) => ({ ...current, is_published: event.target.checked }))}
+                                    className="rounded border-dark-300 text-emerald-600 focus:ring-emerald-500"
+                                />
+                                Publier immédiatement cette leçon
+                            </label>
+                            {lessonErrors.is_published && <p className="text-sm text-red-600">{lessonErrors.is_published}</p>}
+                        </div>
+
+                        <div className="min-w-0 space-y-5 bg-slate-50/60 p-6">
+                            <div>
+                                <h3 className="font-semibold text-dark-900">Fichiers et médias</h3>
+                                <p className="mt-1 text-xs text-dark-500">Ajoutez jusqu’à 4 fichiers par envoi, 500 Mo maximum par fichier.</p>
+                            </div>
+                            <label className="flex cursor-pointer flex-col items-center justify-center rounded-2xl border-2 border-dashed border-emerald-200 bg-white px-6 py-8 text-center transition hover:border-emerald-400 hover:bg-emerald-50/40">
+                                <PlusIcon className="h-8 w-8 text-emerald-600" />
+                                <span className="mt-2 text-sm font-semibold text-emerald-700">Choisir des fichiers</span>
+                                <span className="mt-1 text-xs text-dark-500">Images, vidéos, audios ou PDF</span>
+                                <input
+                                    type="file"
+                                    multiple
+                                    accept="image/*,video/*,audio/*,application/pdf"
+                                    onChange={handleLessonFileChange}
+                                    className="sr-only"
+                                />
+                            </label>
+                            {(lessonErrors.lesson_files || lessonErrors['lesson_files.0']) && (
+                                <p className="text-sm text-red-600">
+                                    {lessonErrors.lesson_files || lessonErrors['lesson_files.0']}
+                                </p>
+                            )}
+                            {lessonForm.deleted_file_ids.length > 0 && (
+                                <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-xs text-amber-800">
+                                    <p className="font-semibold">
+                                        {lessonForm.deleted_file_ids.length} fichier(s) seront supprimés avec « Mettre à jour ».
+                                    </p>
+                                    <div className="mt-2 space-y-1">
+                                        {deletedEditingFiles.map((file) => (
+                                            <div key={file.id} className="flex items-center justify-between gap-3">
+                                                <span className="truncate">{file.original_name}</span>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => restoreLessonFile(file.id)}
+                                                    className="shrink-0 font-semibold text-amber-900 underline"
+                                                >
+                                                    Restaurer
+                                                </button>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
+
+                            <div className="max-h-[52vh] space-y-4 overflow-y-auto pr-2">
+                                {lessonFilePreviews.length > 0 && (
+                                    <div className="space-y-3">
+                                        <p className="text-sm font-semibold text-emerald-700">
+                                            Nouveaux fichiers ({lessonFilePreviews.length})
+                                        </p>
+                                        {lessonFilePreviews.map((preview) => (
+                                            <div key={`${preview.file.name}-${preview.file.lastModified}`} className="rounded-2xl border border-emerald-100 bg-white p-3">
+                                                <div className="mb-2 flex items-center justify-between gap-3">
+                                                    <p className="truncate text-xs font-medium text-dark-600">{preview.file.name}</p>
+                                                    <button type="button" onClick={() => removePendingLessonFile(preview.file)} className="inline-flex shrink-0 items-center text-xs font-semibold text-red-600 hover:text-red-700">
+                                                        <TrashIcon className="mr-1 h-4 w-4" /> Retirer
+                                                    </button>
+                                                </div>
+                                                <MediaPreview source={preview.url} mimeType={preview.file.type} />
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
+                                {lessonAction.mode === 'edit' && visibleEditingFiles.length > 0 && (
+                                    <div className="space-y-3">
+                                        <p className="text-sm font-semibold text-dark-700">
+                                            Fichiers enregistrés ({visibleEditingFiles.length})
+                                        </p>
+                                        {visibleEditingFiles.map((lessonFile) => (
+                                            <div key={lessonFile.id} className="rounded-2xl border border-dark-200 bg-white p-3">
+                                                <div className="mb-2 flex items-center justify-between gap-3">
+                                                    <p className="truncate text-xs font-medium text-dark-600">{lessonFile.original_name}</p>
+                                                    <button type="button" onClick={() => askDeleteLessonFile(lessonFile)} className="inline-flex shrink-0 items-center text-xs font-semibold text-red-600 hover:text-red-700">
+                                                        <TrashIcon className="mr-1 h-4 w-4" /> Supprimer
+                                                    </button>
+                                                </div>
+                                                <MediaPreview source={lessonFile.file_path} mimeType={lessonFile.mime_type ?? ''} />
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
+                                {!lessonFilePreviews.length && !visibleEditingFiles.length && (
+                                    <div className="rounded-2xl border border-dashed border-dark-200 bg-white px-5 py-10 text-center text-sm text-dark-400">
+                                        Aucun fichier sélectionné.
+                                    </div>
+                                )}
+                            </div>
+                        </div>
                     </div>
 
-                    <div>
-                        <label className="mb-1.5 block text-sm font-medium text-dark-700">Fichier de la lecon</label>
-                        <input
-                            type="file"
-                            accept="image/*,video/*,audio/*,application/pdf"
-                            onChange={handleLessonFileChange}
-                            className="block w-full rounded-xl border border-dark-300 bg-white px-4 py-3 text-sm text-dark-800 file:mr-4 file:rounded-lg file:border-0 file:bg-emerald-50 file:px-4 file:py-2 file:font-semibold file:text-emerald-700 hover:file:bg-emerald-100"
-                        />
-                        <p className="mt-2 text-xs text-dark-500">
-                            Formats affichables : image, vidéo, audio ou PDF (vidéo : 500 Mo maximum).
-                        </p>
-                        {lessonFilePreview && (
-                            <div className="mt-4">
-                                <p className="mb-2 text-sm font-semibold text-emerald-700">Aperçu du nouveau contenu</p>
-                                <MediaPreview source={lessonFilePreview} mimeType={lessonForm.lesson_file?.type} />
-                            </div>
-                        )}
-                        {!lessonFilePreview && lessonForm.existing_file_path && (
-                            <div className="mt-4">
-                                <p className="mb-2 text-sm font-semibold text-dark-700">Contenu actuellement enregistré</p>
-                                <MediaPreview source={lessonForm.existing_file_path} />
-                            </div>
-                        )}
-                        {lessonErrors.lesson_file && <p className="mt-2 text-sm text-red-600">{lessonErrors.lesson_file}</p>}
-                    </div>
-
-                    <FormTextarea
-                        label="Description"
-                        name="description"
-                        value={lessonForm.description}
-                        onChange={(event) => setLessonForm((current) => ({ ...current, description: event.target.value }))}
-                        error={lessonErrors.description}
-                        rows={4}
-                    />
-
-                    <label className="flex items-center gap-3 rounded-xl border border-dark-200 bg-dark-50 px-4 py-3 text-sm text-dark-700">
-                        <input
-                            type="checkbox"
-                            checked={lessonForm.is_published}
-                            onChange={(event) => setLessonForm((current) => ({ ...current, is_published: event.target.checked }))}
-                            className="rounded border-dark-300 text-emerald-600 focus:ring-emerald-500"
-                        />
-                        Publier immédiatement cette leçon
-                    </label>
-                    {lessonErrors.is_published && <p className="text-sm text-red-600">{lessonErrors.is_published}</p>}
-
-                    <div className="flex justify-end gap-3">
+                    <div className="flex shrink-0 justify-end gap-3 border-t border-dark-100 bg-white px-6 py-4">
                         <SecondaryButton onClick={closeLessonModal} disabled={processing}>Annuler</SecondaryButton>
                         <PrimaryButton type="submit" className={greenButtonClass} disabled={processing || !lessonTypes.length}>
                             {processing ? 'Enregistrement...' : lessonAction.mode === 'edit' ? 'Mettre à jour' : 'Créer la leçon'}
@@ -1066,14 +1283,7 @@ export default function Index({ courses, lessonTypes }) {
                                                                 </div>
                                                             </div>
                                                             <div className="min-w-0">
-                                                                {lesson.file_path && (
-                                                                    <MediaPreview source={lesson.file_path} className="w-full" />
-                                                                )}
-                                                                {!lesson.file_path && (
-                                                                    <div className="flex min-h-36 items-center justify-center rounded-2xl border border-dashed border-slate-200 bg-slate-50 text-sm text-slate-400">
-                                                                        Aucun fichier
-                                                                    </div>
-                                                                )}
+                                                                <LessonFilesCarousel files={lesson.files ?? []} />
                                                             </div>
                                                             <div className="relative flex items-center justify-end gap-3">
                                                                     <SecondaryButton className="!rounded-xl !px-4 !py-3" onClick={() => openEditLessonModal(lesson)}>

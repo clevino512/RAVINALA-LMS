@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Course;
 use App\Models\CourseModule;
 use App\Models\Lesson;
+use App\Models\LessonFile;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
@@ -18,7 +19,7 @@ class LessonController extends Controller
         abort_unless($module->course_id === $course->id, 404);
 
         $lessons = Lesson::query()
-            ->with('lessonType')
+            ->with(['lessonType', 'files'])
             ->where('module_id', $module->id)
             ->orderBy('position')
             ->get();
@@ -37,7 +38,8 @@ class LessonController extends Controller
         $validated = $request->validate([
             'title' => ['required', 'string', 'max:250'],
             'description' => ['nullable', 'string'],
-            'lesson_file' => [
+            'lesson_files' => ['nullable', 'array', 'max:4'],
+            'lesson_files.*' => [
                 'nullable',
                 'file',
                 'mimetypes:image/*,video/*,audio/*,application/pdf',
@@ -59,7 +61,7 @@ class LessonController extends Controller
         $lesson = Lesson::create([
             'title' => $validated['title'],
             'description' => $validated['description'] ?? null,
-            'file_path' => $request->hasFile('lesson_file') ? $this->storeLessonFile($request) : null,
+            'file_path' => null,
             'duration' => $validated['duration'] ?? null,
             'position' => $validated['position'] ?? ($this->nextPosition($module) + 1),
             'is_published' => $validated['is_published'] ?? false,
@@ -67,9 +69,11 @@ class LessonController extends Controller
             'module_id' => $module->id,
         ]);
 
+        $this->storeLessonFiles($lesson, $request);
+
         return response()->json([
             'message' => 'Lesson created successfully.',
-            'data' => $lesson->load(['lessonType', 'module']),
+            'data' => $lesson->load(['lessonType', 'module', 'files']),
         ], 201);
     }
 
@@ -77,7 +81,7 @@ class LessonController extends Controller
     {
         $this->ensureBelongsToModule($course, $module, $lesson);
 
-        $lesson->load(['lessonType', 'module.course']);
+        $lesson->load(['lessonType', 'module.course', 'files']);
 
         return response()->json(['data' => $lesson]);
     }
@@ -89,12 +93,19 @@ class LessonController extends Controller
         $validated = $request->validate([
             'title' => ['required', 'string', 'max:250'],
             'description' => ['nullable', 'string'],
-            'existing_file_path' => ['nullable', 'string', 'max:500'],
-            'lesson_file' => [
+            'lesson_files' => ['nullable', 'array', 'max:4'],
+            'lesson_files.*' => [
                 'nullable',
                 'file',
                 'mimetypes:image/*,video/*,audio/*,application/pdf',
                 'max:512000',
+            ],
+            'deleted_file_ids' => ['nullable', 'array'],
+            'deleted_file_ids.*' => [
+                'integer',
+                Rule::exists('lesson_files', 'id')->where(
+                    fn ($query) => $query->where('lesson_id', $lesson->id)
+                ),
             ],
             'duration' => ['nullable', 'numeric', 'min:0'],
             'position' => [
@@ -109,26 +120,29 @@ class LessonController extends Controller
             'lesson_type_id' => ['required', 'exists:lesson_types,id'],
         ]);
 
-        $filePath = $validated['existing_file_path'] ?? $lesson->file_path;
-
-        if ($request->hasFile('lesson_file')) {
-            $this->deleteStoredLessonFile($lesson->file_path);
-            $filePath = $this->storeLessonFile($request);
-        }
-
         $lesson->update([
             'title' => $validated['title'],
             'description' => $validated['description'] ?? null,
-            'file_path' => $filePath,
             'duration' => $validated['duration'] ?? null,
             'position' => $validated['position'],
             'is_published' => $validated['is_published'],
             'lesson_type_id' => $validated['lesson_type_id'],
         ]);
 
+        LessonFile::query()
+            ->where('lesson_id', $lesson->id)
+            ->whereIn('id', $validated['deleted_file_ids'] ?? [])
+            ->get()
+            ->each(function (LessonFile $file): void {
+                $this->deleteStoredLessonFile($file->file_path);
+                $file->delete();
+            });
+
+        $this->storeLessonFiles($lesson, $request);
+
         return response()->json([
             'message' => 'Lesson updated successfully.',
-            'data' => $lesson->fresh()->load(['lessonType', 'module']),
+            'data' => $lesson->fresh()->load(['lessonType', 'module', 'files']),
         ]);
     }
 
@@ -156,11 +170,29 @@ class LessonController extends Controller
     {
         $this->ensureBelongsToModule($course, $module, $lesson);
 
-        $this->deleteStoredLessonFile($lesson->file_path);
+        $lesson->load('files');
+        $lesson->files->each(fn (LessonFile $file) => $this->deleteStoredLessonFile($file->file_path));
         $lesson->delete();
 
         return response()->json([
             'message' => 'Lesson deleted successfully.',
+        ]);
+    }
+
+    public function destroyFile(
+        Course $course,
+        CourseModule $module,
+        Lesson $lesson,
+        LessonFile $lessonFile
+    ): JsonResponse {
+        $this->ensureBelongsToModule($course, $module, $lesson);
+        abort_unless($lessonFile->lesson_id === $lesson->id, 404);
+
+        $this->deleteStoredLessonFile($lessonFile->file_path);
+        $lessonFile->delete();
+
+        return response()->json([
+            'message' => 'Le fichier a été supprimé.',
         ]);
     }
 
@@ -176,9 +208,22 @@ class LessonController extends Controller
             ->max('position');
     }
 
-    private function storeLessonFile(Request $request): string
+    private function storeLessonFiles(Lesson $lesson, Request $request): void
     {
-        return $request->file('lesson_file')->store('lessons', 'public');
+        $files = $request->file('lesson_files', []);
+        $nextPosition = (int) $lesson->files()->max('position');
+
+        foreach ($files as $uploadedFile) {
+            $storedPath = $uploadedFile->store('lessons', 'public');
+
+            $lesson->files()->create([
+                'file_path' => $storedPath,
+                'original_name' => $uploadedFile->getClientOriginalName(),
+                'mime_type' => $uploadedFile->getMimeType(),
+                'file_size' => $uploadedFile->getSize(),
+                'position' => ++$nextPosition,
+            ]);
+        }
     }
 
     private function deleteStoredLessonFile(?string $storedPath): void
