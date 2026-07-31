@@ -9,15 +9,19 @@ import AppLayout from '@/Layouts/AppLayout';
 import { Head, router } from '@inertiajs/react';
 import axios from 'axios';
 import {
+    ArrowDownTrayIcon,
     BookOpenIcon,
     ChevronRightIcon,
     ClipboardDocumentListIcon,
+    ClockIcon,
+    DocumentTextIcon,
+    EllipsisHorizontalIcon,
     PencilSquareIcon,
     PlusIcon,
     Squares2X2Icon,
     TrashIcon,
 } from '@heroicons/react/24/outline';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 
 const emptyCourseForm = {
     name: '',
@@ -42,6 +46,116 @@ const emptyLessonForm = {
 };
 
 const greenButtonClass = '!rounded-xl !border !border-emerald-700 !bg-gradient-to-r !from-[#2d8b46] !to-[#24763a] !px-5 !py-3 !text-sm !font-semibold !text-white !shadow-[0_14px_26px_rgba(45,139,70,0.22)] hover:!from-[#25753b] hover:!to-[#1f6331]';
+const maxLessonFileSize = 500 * 1024 * 1024;
+
+const publicMediaUrl = (path) => {
+    if (!path) return null;
+    if (/^(https?:|blob:|data:)/i.test(path)) return path;
+
+    return `/storage/${String(path).replace(/^\/?(storage\/)?/, '')}`;
+};
+
+const mediaKind = (source, mimeType = '') => {
+    if (mimeType.startsWith('image/')) return 'image';
+    if (mimeType.startsWith('video/')) return 'video';
+    if (mimeType.startsWith('audio/')) return 'audio';
+    if (mimeType === 'application/pdf') return 'pdf';
+
+    const cleanSource = String(source ?? '').split(/[?#]/)[0].toLowerCase();
+    if (/\.(jpg|jpeg|png|gif|webp|svg|bmp|avif)$/.test(cleanSource)) return 'image';
+    if (/\.(mp4|webm|ogg|mov|m4v|mkv|avi|wmv|3gp)$/.test(cleanSource)) return 'video';
+    if (/\.(mp3|wav|oga|aac|m4a|flac)$/.test(cleanSource)) return 'audio';
+    if (/\.pdf$/.test(cleanSource)) return 'pdf';
+
+    return 'file';
+};
+
+function VideoPreview({ url, frameClass }) {
+    const videoRef = useRef(null);
+    const [playbackRate, setPlaybackRate] = useState(1);
+
+    const changePlaybackRate = (event) => {
+        const nextRate = Number(event.target.value);
+        setPlaybackRate(nextRate);
+
+        if (videoRef.current) {
+            videoRef.current.playbackRate = nextRate;
+        }
+    };
+
+    return (
+        <div className={`${frameClass} bg-black`}>
+            <video ref={videoRef} src={url} controls preload="metadata" className="max-h-80 w-full">
+                Votre navigateur ne prend pas en charge cette vidéo.
+            </video>
+            <div className="flex items-center justify-end gap-2 border-t border-white/10 bg-slate-950 px-4 py-2 text-sm text-white">
+                <label htmlFor={`video-speed-${encodeURIComponent(url)}`} className="font-medium">
+                    Vitesse
+                </label>
+                <select
+                    id={`video-speed-${encodeURIComponent(url)}`}
+                    value={playbackRate}
+                    onChange={changePlaybackRate}
+                    className="rounded-lg border-white/20 bg-slate-800 py-1 pl-3 pr-8 text-sm text-white focus:border-emerald-400 focus:ring-emerald-400"
+                >
+                    {[0.5, 0.75, 1, 1.25, 1.5, 1.75, 2].map((rate) => (
+                        <option key={rate} value={rate}>{rate}x</option>
+                    ))}
+                </select>
+            </div>
+        </div>
+    );
+}
+
+function MediaPreview({ source, mimeType = '', className = '' }) {
+    const url = publicMediaUrl(source);
+    if (!url) return null;
+
+    const kind = mediaKind(source, mimeType);
+    const frameClass = `overflow-hidden rounded-2xl border border-dark-200 bg-dark-50 ${className}`;
+
+    if (kind === 'image') {
+        return <div className={frameClass}><img src={url} alt="Aperçu de la leçon" className="h-64 w-full object-contain" /></div>;
+    }
+
+    if (kind === 'video') {
+        return <VideoPreview url={url} frameClass={frameClass} />;
+    }
+
+    if (kind === 'audio') {
+        return <div className={`${frameClass} p-4`}><audio src={url} controls preload="metadata" className="w-full" /></div>;
+    }
+
+    if (kind === 'pdf') {
+        const fileName = decodeURIComponent(String(source).split('/').pop()?.split(/[?#]/)[0] || 'Document PDF');
+
+        return (
+            <div className={`${frameClass} flex min-h-40 items-center gap-5 p-6`}>
+                <div className="flex h-28 w-20 shrink-0 flex-col items-center justify-end rounded-xl border border-slate-200 bg-white p-3 shadow-sm">
+                    <DocumentTextIcon className="mb-2 h-9 w-9 text-slate-400" />
+                    <span className="rounded-md bg-red-500 px-2 py-1 text-xs font-bold text-white">PDF</span>
+                </div>
+                <div className="min-w-0">
+                    <p className="truncate font-semibold text-dark-800">{fileName}</p>
+                    <a
+                        href={url}
+                        download={fileName}
+                        className="mt-4 inline-flex items-center rounded-xl border border-dark-200 bg-white px-4 py-2 text-sm font-semibold text-dark-700 shadow-sm hover:bg-dark-50"
+                    >
+                        <ArrowDownTrayIcon className="mr-2 h-5 w-5" />
+                        Télécharger le PDF
+                    </a>
+                </div>
+            </div>
+        );
+    }
+
+    return (
+        <a href={url} target="_blank" rel="noreferrer" className={`${frameClass} block px-4 py-5 text-sm font-semibold text-emerald-700 hover:bg-emerald-50`}>
+            Ouvrir le contenu de la leçon
+        </a>
+    );
+}
 
 export default function Index({ courses, lessonTypes }) {
     const [selectedCourseId, setSelectedCourseId] = useState(courses[0]?.id ?? null);
@@ -62,6 +176,9 @@ export default function Index({ courses, lessonTypes }) {
     const [confirmState, setConfirmState] = useState({ title: '', message: '', onConfirm: null });
     const [processing, setProcessing] = useState(false);
     const [feedback, setFeedback] = useState(null);
+    const [lessonFilePreview, setLessonFilePreview] = useState(null);
+    const [lessonMenuId, setLessonMenuId] = useState(null);
+    const [publishingLessonId, setPublishingLessonId] = useState(null);
 
     const selectedCourse = useMemo(
         () => courses.find((course) => course.id === selectedCourseId) ?? null,
@@ -114,6 +231,18 @@ export default function Index({ courses, lessonTypes }) {
 
         return () => window.clearTimeout(timeout);
     }, [feedback]);
+
+    useEffect(() => {
+        if (!(lessonForm.lesson_file instanceof File)) {
+            setLessonFilePreview(null);
+            return undefined;
+        }
+
+        const objectUrl = URL.createObjectURL(lessonForm.lesson_file);
+        setLessonFilePreview(objectUrl);
+
+        return () => URL.revokeObjectURL(objectUrl);
+    }, [lessonForm.lesson_file]);
 
     const closeCourseModal = () => {
         setCourseModalOpen(false);
@@ -175,12 +304,20 @@ export default function Index({ courses, lessonTypes }) {
         setModuleModalOpen(true);
     };
 
-    const openCreateLessonModal = () => {
-        if (!selectedModule) return;
-        setLessonAction({ mode: 'create', item: null });
+    const openCreateLessonModal = (requestedModule = null) => {
+        const targetModule = requestedModule?.id ? requestedModule : selectedModule;
+        if (!targetModule) return;
+
+        const nextPosition = Math.max(
+            0,
+            ...(targetModule.lessons ?? []).map((lesson) => Number(lesson.position) || 0),
+        ) + 1;
+
+        setSelectedModuleId(targetModule.id);
+        setLessonAction({ mode: 'create', item: null, moduleId: targetModule.id });
         setLessonForm({
             ...emptyLessonForm,
-            position: String((selectedModule.lessons?.length ?? 0) + 1),
+            position: String(nextPosition),
             lesson_type_id: lessonTypes[0]?.id ? String(lessonTypes[0].id) : '',
         });
         setLessonErrors({});
@@ -188,7 +325,7 @@ export default function Index({ courses, lessonTypes }) {
     };
 
     const openEditLessonModal = (lesson) => {
-        setLessonAction({ mode: 'edit', item: lesson });
+        setLessonAction({ mode: 'edit', item: lesson, moduleId: selectedModule?.id });
         setLessonForm({
             title: lesson.title ?? '',
             description: lesson.description ?? '',
@@ -201,6 +338,23 @@ export default function Index({ courses, lessonTypes }) {
         });
         setLessonErrors({});
         setLessonModalOpen(true);
+    };
+
+    const handleLessonFileChange = (event) => {
+        const file = event.target.files?.[0] ?? null;
+
+        if (file && file.size > maxLessonFileSize) {
+            event.target.value = '';
+            setLessonForm((current) => ({ ...current, lesson_file: null }));
+            setLessonErrors((current) => ({
+                ...current,
+                lesson_file: ['La taille de la vidéo ou du fichier ne doit pas dépasser 500 Mo.'],
+            }));
+            return;
+        }
+
+        setLessonErrors((current) => ({ ...current, lesson_file: undefined }));
+        setLessonForm((current) => ({ ...current, lesson_file: file }));
     };
 
     const submitCourse = async (event) => {
@@ -261,6 +415,7 @@ export default function Index({ courses, lessonTypes }) {
     const submitLesson = async (event) => {
         event.preventDefault();
         if (!selectedCourse || !selectedModule) return;
+        const targetModuleId = lessonAction.moduleId ?? selectedModule.id;
         setProcessing(true);
         setLessonErrors({});
         setFeedback(null);
@@ -281,7 +436,7 @@ export default function Index({ courses, lessonTypes }) {
 
             const response = lessonAction.mode === 'edit' && lessonAction.item
                 ? await axios.post(
-                    route('admin.lms.courses.modules.lessons.update', [selectedCourse.id, selectedModule.id, lessonAction.item.id]),
+                    route('admin.lms.courses.modules.lessons.update', [selectedCourse.id, targetModuleId, lessonAction.item.id]),
                     (() => {
                         payload.append('_method', 'put');
                         return payload;
@@ -289,7 +444,7 @@ export default function Index({ courses, lessonTypes }) {
                     { headers: { 'Content-Type': 'multipart/form-data' } },
                 )
                 : await axios.post(
-                    route('admin.lms.courses.modules.lessons.store', [selectedCourse.id, selectedModule.id]),
+                    route('admin.lms.courses.modules.lessons.store', [selectedCourse.id, targetModuleId]),
                     payload,
                     { headers: { 'Content-Type': 'multipart/form-data' } },
                 );
@@ -303,6 +458,38 @@ export default function Index({ courses, lessonTypes }) {
             setFeedback({ type: 'error', message: resolveErrorMessage(error, 'Impossible d enregistrer la lecon.') });
         } finally {
             setProcessing(false);
+        }
+    };
+
+    const toggleLessonPublication = async (lesson, isPublished) => {
+        if (!selectedCourse || !selectedModule) return;
+
+        setPublishingLessonId(lesson.id);
+        setFeedback(null);
+
+        try {
+            const response = await axios.patch(
+                route('admin.lms.courses.modules.lessons.publication', [
+                    selectedCourse.id,
+                    selectedModule.id,
+                    lesson.id,
+                ]),
+                { is_published: isPublished },
+            );
+
+            reloadData(() => {
+                setFeedback({
+                    type: 'success',
+                    message: response?.data?.message ?? 'Le statut de publication a été mis à jour.',
+                });
+            });
+        } catch (error) {
+            setFeedback({
+                type: 'error',
+                message: resolveErrorMessage(error, 'Impossible de modifier la publication de la leçon.'),
+            });
+        } finally {
+            setPublishingLessonId(null);
         }
     };
 
@@ -556,14 +743,24 @@ export default function Index({ courses, lessonTypes }) {
                         <label className="mb-1.5 block text-sm font-medium text-dark-700">Fichier de la lecon</label>
                         <input
                             type="file"
-                            onChange={(event) => setLessonForm((current) => ({ ...current, lesson_file: event.target.files?.[0] ?? null }))}
+                            accept="image/*,video/*,audio/*,application/pdf"
+                            onChange={handleLessonFileChange}
                             className="block w-full rounded-xl border border-dark-300 bg-white px-4 py-3 text-sm text-dark-800 file:mr-4 file:rounded-lg file:border-0 file:bg-emerald-50 file:px-4 file:py-2 file:font-semibold file:text-emerald-700 hover:file:bg-emerald-100"
                         />
-                        {lessonForm.lesson_file && (
-                            <p className="mt-2 text-xs text-emerald-700">Fichier selectionne: {lessonForm.lesson_file.name}</p>
+                        <p className="mt-2 text-xs text-dark-500">
+                            Formats affichables : image, vidéo, audio ou PDF (vidéo : 500 Mo maximum).
+                        </p>
+                        {lessonFilePreview && (
+                            <div className="mt-4">
+                                <p className="mb-2 text-sm font-semibold text-emerald-700">Aperçu du nouveau contenu</p>
+                                <MediaPreview source={lessonFilePreview} mimeType={lessonForm.lesson_file?.type} />
+                            </div>
                         )}
-                        {!lessonForm.lesson_file && lessonForm.existing_file_path && (
-                            <p className="mt-2 break-all text-xs text-dark-500">Chemin actuel: {lessonForm.existing_file_path}</p>
+                        {!lessonFilePreview && lessonForm.existing_file_path && (
+                            <div className="mt-4">
+                                <p className="mb-2 text-sm font-semibold text-dark-700">Contenu actuellement enregistré</p>
+                                <MediaPreview source={lessonForm.existing_file_path} />
+                            </div>
                         )}
                         {lessonErrors.lesson_file && <p className="mt-2 text-sm text-red-600">{lessonErrors.lesson_file}</p>}
                     </div>
@@ -774,10 +971,7 @@ export default function Index({ courses, lessonTypes }) {
                                                             <PencilSquareIcon className="mr-2 h-4 w-4" />
                                                             Modifier
                                                         </SecondaryButton>
-                                                        <SecondaryButton className="!rounded-xl" onClick={() => {
-                                                            setSelectedModuleId(module.id);
-                                                            openCreateLessonModal();
-                                                        }}>
+                                                        <SecondaryButton className="!rounded-xl" onClick={() => openCreateLessonModal(module)}>
                                                             <PlusIcon className="mr-2 h-4 w-4" />
                                                             Ajouter une leçon
                                                         </SecondaryButton>
@@ -796,25 +990,25 @@ export default function Index({ courses, lessonTypes }) {
                                     </div>
                                 </section>
 
-                                <section className="rounded-3xl border border-dark-100 bg-white shadow-sm">
-                                    <div className="flex items-center justify-between border-b border-dark-100 px-6 py-5">
+                                <section className="rounded-3xl border border-dark-100 bg-white p-6 shadow-sm">
+                                    <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
                                         <div>
-                                            <h2 className="text-lg font-semibold text-dark-900">
-                                                {selectedModule ? `Leçons du module "${selectedModule.title}"` : 'Leçons'}
+                                            <h2 className="text-2xl font-bold text-dark-900">
+                                                Leçons du module
                                             </h2>
-                                            <p className="mt-1 text-sm text-dark-500">
-                                                {selectedModule ? 'Gérez le contenu détaillé du module sélectionné.' : 'Sélectionnez un module pour afficher ses leçons.'}
+                                            <p className="mt-1 text-base font-medium text-slate-500">
+                                                {selectedModule?.title || 'Sélectionnez un module'}
                                             </p>
                                         </div>
                                         {selectedModule && (
                                             <PrimaryButton className={greenButtonClass} onClick={openCreateLessonModal} disabled={!lessonTypes.length}>
-                                                <PlusIcon className="mr-2 h-4 w-4" />
-                                                Nouvelle leçon
+                                                <PlusIcon className="mr-2 h-5 w-5" />
+                                                Ajouter une leçon
                                             </PrimaryButton>
                                         )}
                                     </div>
 
-                                    <div className="p-4">
+                                    <div className="mt-7">
                                         {!selectedModule ? (
                                             <div className="rounded-2xl border border-dashed border-dark-200 px-5 py-10 text-center text-sm text-dark-500">
                                                 Sélectionnez un module pour consulter ou gérer ses leçons.
@@ -824,11 +1018,17 @@ export default function Index({ courses, lessonTypes }) {
                                                 Aucune leçon n’a encore été ajoutée à ce module.
                                             </div>
                                         ) : (
-                                            <div className="space-y-3">
+                                            <div className="space-y-5">
                                                 {selectedModule.lessons.map((lesson) => (
-                                                    <div key={lesson.id} className="rounded-2xl border border-dark-100 bg-white p-5">
-                                                        <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-                                                            <div>
+                                                    <article key={lesson.id} className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm transition hover:shadow-md">
+                                                        <div className="grid items-center gap-5 xl:grid-cols-[44px_58px_minmax(260px,1fr)_minmax(300px,420px)_190px]">
+                                                            <div className="hidden text-center text-2xl leading-none tracking-[-4px] text-slate-400 xl:block" aria-hidden="true">
+                                                                ⠿
+                                                            </div>
+                                                            <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-amber-100 text-lg font-bold text-amber-700">
+                                                                {lesson.position}
+                                                            </div>
+                                                            <div className="min-w-0">
                                                                 <div className="flex flex-wrap items-center gap-2">
                                                                     <span className="rounded-full bg-amber-100 px-3 py-1 text-xs font-semibold text-amber-700">
                                                                         Leçon {lesson.position}
@@ -843,32 +1043,67 @@ export default function Index({ courses, lessonTypes }) {
                                                                     }`}>
                                                                         {lesson.is_published ? 'Publiée' : 'Brouillon'}
                                                                     </span>
+                                                                    <label className="ml-1 inline-flex cursor-pointer items-center gap-2 rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-semibold text-slate-600 shadow-sm">
+                                                                        <input
+                                                                            type="checkbox"
+                                                                            checked={Boolean(lesson.is_published)}
+                                                                            disabled={publishingLessonId === lesson.id}
+                                                                            onChange={(event) => toggleLessonPublication(lesson, event.target.checked)}
+                                                                            className="rounded border-slate-300 text-emerald-600 focus:ring-emerald-500 disabled:opacity-50"
+                                                                        />
+                                                                        {publishingLessonId === lesson.id
+                                                                            ? 'Enregistrement...'
+                                                                            : 'Rendre publique'}
+                                                                    </label>
                                                                 </div>
                                                                 <h3 className="mt-3 text-lg font-semibold text-dark-900">{lesson.title}</h3>
                                                                 <p className="mt-2 text-sm text-dark-500">
                                                                     {lesson.description || 'Aucune description'}
                                                                 </p>
-                                                                <div className="mt-3 flex flex-wrap gap-4 text-xs text-dark-500">
-                                                                    <span>Durée: {lesson.duration || 'Non définie'}</span>
-                                                                    <span>Fichier: {lesson.file_path || 'Aucun chemin renseigné'}</span>
+                                                                <div className="mt-4 flex items-center gap-2 text-sm font-medium text-slate-500">
+                                                                    <ClockIcon className="h-5 w-5" />
+                                                                    <span>{lesson.duration ? `${lesson.duration} min` : 'Durée non définie'}</span>
                                                                 </div>
                                                             </div>
-                                                            <div className="flex flex-wrap gap-2">
-                                                                <SecondaryButton className="!rounded-xl" onClick={() => openEditLessonModal(lesson)}>
-                                                                    <PencilSquareIcon className="mr-2 h-4 w-4" />
-                                                                    Modifier
-                                                                </SecondaryButton>
-                                                                <button
-                                                                    type="button"
-                                                                    onClick={() => askDeleteLesson(lesson)}
-                                                                    className="inline-flex items-center rounded-xl border border-red-200 bg-red-50 px-4 py-2 text-xs font-semibold uppercase tracking-widest text-red-700 transition hover:bg-red-100"
-                                                                >
-                                                                    <TrashIcon className="mr-2 h-4 w-4" />
-                                                                    Supprimer
-                                                                </button>
+                                                            <div className="min-w-0">
+                                                                {lesson.file_path && (
+                                                                    <MediaPreview source={lesson.file_path} className="w-full" />
+                                                                )}
+                                                                {!lesson.file_path && (
+                                                                    <div className="flex min-h-36 items-center justify-center rounded-2xl border border-dashed border-slate-200 bg-slate-50 text-sm text-slate-400">
+                                                                        Aucun fichier
+                                                                    </div>
+                                                                )}
+                                                            </div>
+                                                            <div className="relative flex items-center justify-end gap-3">
+                                                                    <SecondaryButton className="!rounded-xl !px-4 !py-3" onClick={() => openEditLessonModal(lesson)}>
+                                                                        <PencilSquareIcon className="mr-2 h-4 w-4" />
+                                                                        Modifier
+                                                                    </SecondaryButton>
+                                                                    <button
+                                                                        type="button"
+                                                                        onClick={() => setLessonMenuId((current) => current === lesson.id ? null : lesson.id)}
+                                                                        className="inline-flex h-11 w-11 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-600 shadow-sm transition hover:bg-slate-50"
+                                                                        aria-label="Actions de la leçon"
+                                                                    >
+                                                                        <EllipsisHorizontalIcon className="h-6 w-6" />
+                                                                    </button>
+                                                                    {lessonMenuId === lesson.id && (
+                                                                        <button
+                                                                            type="button"
+                                                                            onClick={() => {
+                                                                                setLessonMenuId(null);
+                                                                                askDeleteLesson(lesson);
+                                                                            }}
+                                                                            className="absolute right-0 top-14 z-10 inline-flex items-center rounded-xl border border-red-100 bg-white px-4 py-3 text-sm font-semibold text-red-600 shadow-lg hover:bg-red-50"
+                                                                        >
+                                                                            <TrashIcon className="mr-2 h-5 w-5" />
+                                                                            Supprimer
+                                                                        </button>
+                                                                    )}
                                                             </div>
                                                         </div>
-                                                    </div>
+                                                    </article>
                                                 ))}
                                             </div>
                                         )}
@@ -886,8 +1121,3 @@ export default function Index({ courses, lessonTypes }) {
         </AppLayout>
     );
 }
-
-
-
-
-

@@ -37,7 +37,12 @@ class LessonController extends Controller
         $validated = $request->validate([
             'title' => ['required', 'string', 'max:250'],
             'description' => ['nullable', 'string'],
-            'lesson_file' => ['nullable', 'file', 'max:51200'],
+            'lesson_file' => [
+                'nullable',
+                'file',
+                'mimetypes:image/*,video/*,audio/*,application/pdf',
+                'max:512000',
+            ],
             'duration' => ['nullable', 'numeric', 'min:0'],
             'position' => [
                 'nullable',
@@ -85,7 +90,12 @@ class LessonController extends Controller
             'title' => ['required', 'string', 'max:250'],
             'description' => ['nullable', 'string'],
             'existing_file_path' => ['nullable', 'string', 'max:500'],
-            'lesson_file' => ['nullable', 'file', 'max:51200'],
+            'lesson_file' => [
+                'nullable',
+                'file',
+                'mimetypes:image/*,video/*,audio/*,application/pdf',
+                'max:512000',
+            ],
             'duration' => ['nullable', 'numeric', 'min:0'],
             'position' => [
                 'required',
@@ -119,6 +129,26 @@ class LessonController extends Controller
         return response()->json([
             'message' => 'Lesson updated successfully.',
             'data' => $lesson->fresh()->load(['lessonType', 'module']),
+        ]);
+    }
+
+    public function updatePublication(Request $request, Course $course, CourseModule $module, Lesson $lesson): JsonResponse
+    {
+        $this->ensureBelongsToModule($course, $module, $lesson);
+
+        $validated = $request->validate([
+            'is_published' => ['required', 'boolean'],
+        ]);
+
+        $lesson->update([
+            'is_published' => $validated['is_published'],
+        ]);
+
+        return response()->json([
+            'message' => $lesson->is_published
+                ? 'La leçon est maintenant publiée.'
+                : 'La leçon est maintenant en brouillon.',
+            'data' => $lesson->fresh()->load('lessonType'),
         ]);
     }
 
