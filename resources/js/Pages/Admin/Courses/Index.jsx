@@ -9,15 +9,20 @@ import AppLayout from '@/Layouts/AppLayout';
 import { Head, router } from '@inertiajs/react';
 import axios from 'axios';
 import {
+    ArrowDownTrayIcon,
     BookOpenIcon,
+    ChevronLeftIcon,
     ChevronRightIcon,
     ClipboardDocumentListIcon,
+    ClockIcon,
+    DocumentTextIcon,
+    EllipsisHorizontalIcon,
     PencilSquareIcon,
     PlusIcon,
     Squares2X2Icon,
     TrashIcon,
 } from '@heroicons/react/24/outline';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 
 const emptyCourseForm = {
     name: '',
@@ -33,8 +38,8 @@ const emptyModuleForm = {
 const emptyLessonForm = {
     title: '',
     description: '',
-    lesson_file: null,
-    existing_file_path: '',
+    lesson_files: [],
+    deleted_file_ids: [],
     duration: '',
     position: '',
     is_published: false,
@@ -42,6 +47,203 @@ const emptyLessonForm = {
 };
 
 const greenButtonClass = '!rounded-xl !border !border-emerald-700 !bg-gradient-to-r !from-[#2d8b46] !to-[#24763a] !px-5 !py-3 !text-sm !font-semibold !text-white !shadow-[0_14px_26px_rgba(45,139,70,0.22)] hover:!from-[#25753b] hover:!to-[#1f6331]';
+const maxLessonFileSize = 500 * 1024 * 1024;
+
+const publicMediaUrl = (path) => {
+    if (!path) return null;
+    if (/^(https?:|blob:|data:)/i.test(path)) return path;
+
+    return `/storage/${String(path).replace(/^\/?(storage\/)?/, '')}`;
+};
+
+const mediaKind = (source, mimeType = '') => {
+    if (mimeType.startsWith('image/')) return 'image';
+    if (mimeType.startsWith('video/')) return 'video';
+    if (mimeType.startsWith('audio/')) return 'audio';
+    if (mimeType === 'application/pdf') return 'pdf';
+
+    const cleanSource = String(source ?? '').split(/[?#]/)[0].toLowerCase();
+    if (/\.(jpg|jpeg|png|gif|webp|svg|bmp|avif)$/.test(cleanSource)) return 'image';
+    if (/\.(mp4|webm|ogg|mov|m4v|mkv|avi|wmv|3gp)$/.test(cleanSource)) return 'video';
+    if (/\.(mp3|wav|oga|aac|m4a|flac)$/.test(cleanSource)) return 'audio';
+    if (/\.pdf$/.test(cleanSource)) return 'pdf';
+
+    return 'file';
+};
+
+function VideoPreview({ url, frameClass }) {
+    const videoRef = useRef(null);
+    const [playbackRate, setPlaybackRate] = useState(1);
+
+    const changePlaybackRate = (event) => {
+        const nextRate = Number(event.target.value);
+        setPlaybackRate(nextRate);
+
+        if (videoRef.current) {
+            videoRef.current.playbackRate = nextRate;
+        }
+    };
+
+    return (
+        <div className={`${frameClass} bg-black`}>
+            <video ref={videoRef} src={url} controls preload="metadata" className="max-h-80 w-full">
+                Votre navigateur ne prend pas en charge cette vidéo.
+            </video>
+            <div className="flex items-center justify-end gap-2 border-t border-white/10 bg-slate-950 px-4 py-2 text-sm text-white">
+                <label htmlFor={`video-speed-${encodeURIComponent(url)}`} className="font-medium">
+                    Vitesse
+                </label>
+                <select
+                    id={`video-speed-${encodeURIComponent(url)}`}
+                    value={playbackRate}
+                    onChange={changePlaybackRate}
+                    className="rounded-lg border-white/20 bg-slate-800 py-1 pl-3 pr-8 text-sm text-white focus:border-emerald-400 focus:ring-emerald-400"
+                >
+                    {[0.5, 0.75, 1, 1.25, 1.5, 1.75, 2].map((rate) => (
+                        <option key={rate} value={rate}>{rate}x</option>
+                    ))}
+                </select>
+            </div>
+        </div>
+    );
+}
+
+function MediaPreview({ source, mimeType = '', className = '' }) {
+    const url = publicMediaUrl(source);
+    if (!url) return null;
+
+    const kind = mediaKind(source, mimeType);
+    const frameClass = `overflow-hidden rounded-2xl border border-dark-200 bg-dark-50 ${className}`;
+
+    if (kind === 'image') {
+        return <div className={frameClass}><img src={url} alt="Aperçu de la leçon" className="h-64 w-full object-contain" /></div>;
+    }
+
+    if (kind === 'video') {
+        return <VideoPreview url={url} frameClass={frameClass} />;
+    }
+
+    if (kind === 'audio') {
+        return <div className={`${frameClass} p-4`}><audio src={url} controls preload="metadata" className="w-full" /></div>;
+    }
+
+    if (kind === 'pdf') {
+        const fileName = decodeURIComponent(String(source).split('/').pop()?.split(/[?#]/)[0] || 'Document PDF');
+
+        return (
+            <div className={`${frameClass} flex min-h-40 items-center gap-5 p-6`}>
+                <div className="flex h-28 w-20 shrink-0 flex-col items-center justify-end rounded-xl border border-slate-200 bg-white p-3 shadow-sm">
+                    <DocumentTextIcon className="mb-2 h-9 w-9 text-slate-400" />
+                    <span className="rounded-md bg-red-500 px-2 py-1 text-xs font-bold text-white">PDF</span>
+                </div>
+                <div className="min-w-0">
+                    <p className="truncate font-semibold text-dark-800">{fileName}</p>
+                    <a
+                        href={url}
+                        download={fileName}
+                        className="mt-4 inline-flex items-center rounded-xl border border-dark-200 bg-white px-4 py-2 text-sm font-semibold text-dark-700 shadow-sm hover:bg-dark-50"
+                    >
+                        <ArrowDownTrayIcon className="mr-2 h-5 w-5" />
+                        Télécharger le PDF
+                    </a>
+                </div>
+            </div>
+        );
+    }
+
+    return (
+        <a href={url} target="_blank" rel="noreferrer" className={`${frameClass} block px-4 py-5 text-sm font-semibold text-emerald-700 hover:bg-emerald-50`}>
+            Ouvrir le contenu de la leçon
+        </a>
+    );
+}
+
+function LessonFilesCarousel({ files }) {
+    const carouselRef = useRef(null);
+    const [activeIndex, setActiveIndex] = useState(0);
+
+    useEffect(() => {
+        setActiveIndex((current) => Math.min(current, Math.max(files.length - 1, 0)));
+    }, [files.length]);
+
+    const scrollToFile = (nextIndex) => {
+        const safeIndex = Math.max(0, Math.min(nextIndex, files.length - 1));
+        const container = carouselRef.current;
+
+        if (!container) return;
+
+        container.scrollTo({
+            left: safeIndex * container.clientWidth,
+            behavior: 'smooth',
+        });
+        setActiveIndex(safeIndex);
+    };
+
+    const handleScroll = () => {
+        const container = carouselRef.current;
+        if (!container?.clientWidth) return;
+
+        setActiveIndex(Math.round(container.scrollLeft / container.clientWidth));
+    };
+
+    if (!files?.length) {
+        return (
+            <div className="flex min-h-36 items-center justify-center rounded-2xl border border-dashed border-slate-200 bg-slate-50 text-sm text-slate-400">
+                Aucun fichier
+            </div>
+        );
+    }
+
+    return (
+        <div className="relative">
+            <div className="mb-2 flex items-center justify-between gap-3">
+                <span className="text-xs font-semibold text-slate-500">
+                    Fichier {activeIndex + 1} sur {files.length}
+                </span>
+                {files.length > 1 && (
+                    <div className="flex gap-2">
+                        <button
+                            type="button"
+                            onClick={() => scrollToFile(activeIndex - 1)}
+                            disabled={activeIndex === 0}
+                            className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-700 shadow-sm hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40"
+                            aria-label="Fichier précédent"
+                        >
+                            <ChevronLeftIcon className="h-5 w-5" />
+                        </button>
+                        <button
+                            type="button"
+                            onClick={() => scrollToFile(activeIndex + 1)}
+                            disabled={activeIndex === files.length - 1}
+                            className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-700 shadow-sm hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40"
+                            aria-label="Fichier suivant"
+                        >
+                            <ChevronRightIcon className="h-5 w-5" />
+                        </button>
+                    </div>
+                )}
+            </div>
+            <div
+                ref={carouselRef}
+                onScroll={handleScroll}
+                className="flex snap-x snap-mandatory overflow-x-auto scroll-smooth [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+            >
+                {files.map((lessonFile) => (
+                    <div key={lessonFile.id} className="w-full min-w-full snap-start">
+                        <p className="mb-1 truncate text-xs font-medium text-slate-500">
+                            {lessonFile.original_name}
+                        </p>
+                        <MediaPreview
+                            source={lessonFile.file_path}
+                            mimeType={lessonFile.mime_type ?? ''}
+                            className="w-full"
+                        />
+                    </div>
+                ))}
+            </div>
+        </div>
+    );
+}
 
 export default function Index({ courses, lessonTypes }) {
     const [selectedCourseId, setSelectedCourseId] = useState(courses[0]?.id ?? null);
@@ -62,6 +264,9 @@ export default function Index({ courses, lessonTypes }) {
     const [confirmState, setConfirmState] = useState({ title: '', message: '', onConfirm: null });
     const [processing, setProcessing] = useState(false);
     const [feedback, setFeedback] = useState(null);
+    const [lessonFilePreviews, setLessonFilePreviews] = useState([]);
+    const [lessonMenuId, setLessonMenuId] = useState(null);
+    const [publishingLessonId, setPublishingLessonId] = useState(null);
 
     const selectedCourse = useMemo(
         () => courses.find((course) => course.id === selectedCourseId) ?? null,
@@ -71,6 +276,25 @@ export default function Index({ courses, lessonTypes }) {
     const selectedModule = useMemo(
         () => selectedCourse?.modules?.find((module) => module.id === selectedModuleId) ?? null,
         [selectedCourse, selectedModuleId],
+    );
+
+    const editingLesson = useMemo(
+        () => selectedModule?.lessons?.find((lesson) => lesson.id === lessonAction.item?.id) ?? lessonAction.item,
+        [selectedModule, lessonAction.item],
+    );
+
+    const visibleEditingFiles = useMemo(
+        () => (editingLesson?.files ?? []).filter(
+            (file) => !lessonForm.deleted_file_ids.includes(file.id),
+        ),
+        [editingLesson, lessonForm.deleted_file_ids],
+    );
+
+    const deletedEditingFiles = useMemo(
+        () => (editingLesson?.files ?? []).filter(
+            (file) => lessonForm.deleted_file_ids.includes(file.id),
+        ),
+        [editingLesson, lessonForm.deleted_file_ids],
     );
 
     const stats = useMemo(() => ({
@@ -114,6 +338,21 @@ export default function Index({ courses, lessonTypes }) {
 
         return () => window.clearTimeout(timeout);
     }, [feedback]);
+
+    useEffect(() => {
+        if (!lessonForm.lesson_files.length) {
+            setLessonFilePreviews([]);
+            return undefined;
+        }
+
+        const previews = lessonForm.lesson_files.map((file) => ({
+            file,
+            url: URL.createObjectURL(file),
+        }));
+        setLessonFilePreviews(previews);
+
+        return () => previews.forEach((preview) => URL.revokeObjectURL(preview.url));
+    }, [lessonForm.lesson_files]);
 
     const closeCourseModal = () => {
         setCourseModalOpen(false);
@@ -175,12 +414,20 @@ export default function Index({ courses, lessonTypes }) {
         setModuleModalOpen(true);
     };
 
-    const openCreateLessonModal = () => {
-        if (!selectedModule) return;
-        setLessonAction({ mode: 'create', item: null });
+    const openCreateLessonModal = (requestedModule = null) => {
+        const targetModule = requestedModule?.id ? requestedModule : selectedModule;
+        if (!targetModule) return;
+
+        const nextPosition = Math.max(
+            0,
+            ...(targetModule.lessons ?? []).map((lesson) => Number(lesson.position) || 0),
+        ) + 1;
+
+        setSelectedModuleId(targetModule.id);
+        setLessonAction({ mode: 'create', item: null, moduleId: targetModule.id });
         setLessonForm({
             ...emptyLessonForm,
-            position: String((selectedModule.lessons?.length ?? 0) + 1),
+            position: String(nextPosition),
             lesson_type_id: lessonTypes[0]?.id ? String(lessonTypes[0].id) : '',
         });
         setLessonErrors({});
@@ -188,12 +435,12 @@ export default function Index({ courses, lessonTypes }) {
     };
 
     const openEditLessonModal = (lesson) => {
-        setLessonAction({ mode: 'edit', item: lesson });
+        setLessonAction({ mode: 'edit', item: lesson, moduleId: selectedModule?.id });
         setLessonForm({
             title: lesson.title ?? '',
             description: lesson.description ?? '',
-            lesson_file: null,
-            existing_file_path: lesson.file_path ?? '',
+            lesson_files: [],
+            deleted_file_ids: [],
             duration: lesson.duration ?? '',
             position: String(lesson.position ?? ''),
             is_published: Boolean(lesson.is_published),
@@ -201,6 +448,50 @@ export default function Index({ courses, lessonTypes }) {
         });
         setLessonErrors({});
         setLessonModalOpen(true);
+    };
+
+    const handleLessonFileChange = (event) => {
+        const input = event.target;
+        const newFiles = Array.from(input.files ?? []);
+        const oversizedFile = newFiles.find((file) => file.size > maxLessonFileSize);
+
+        if (oversizedFile) {
+            input.value = '';
+            setLessonErrors((current) => ({
+                ...current,
+                lesson_files: [`Le fichier "${oversizedFile.name}" dépasse la taille maximale de 500 Mo.`],
+            }));
+            return;
+        }
+
+        const existingKeys = new Set(
+            lessonForm.lesson_files.map((file) => `${file.name}-${file.size}-${file.lastModified}`),
+        );
+        const uniqueNewFiles = newFiles.filter(
+            (file) => !existingKeys.has(`${file.name}-${file.size}-${file.lastModified}`),
+        );
+        const combinedFiles = [...lessonForm.lesson_files, ...uniqueNewFiles];
+
+        if (combinedFiles.length > 4) {
+            setLessonErrors((errors) => ({
+                ...errors,
+                lesson_files: ['Vous pouvez envoyer au maximum 4 fichiers à la fois. Retirez un fichier avant d’en ajouter un autre.'],
+            }));
+            input.value = '';
+            return;
+        }
+
+        setLessonErrors((errors) => ({ ...errors, lesson_files: undefined }));
+        setLessonForm((current) => ({ ...current, lesson_files: combinedFiles }));
+
+        input.value = '';
+    };
+
+    const removePendingLessonFile = (fileToRemove) => {
+        setLessonForm((current) => ({
+            ...current,
+            lesson_files: current.lesson_files.filter((file) => file !== fileToRemove),
+        }));
     };
 
     const submitCourse = async (event) => {
@@ -261,6 +552,7 @@ export default function Index({ courses, lessonTypes }) {
     const submitLesson = async (event) => {
         event.preventDefault();
         if (!selectedCourse || !selectedModule) return;
+        const targetModuleId = lessonAction.moduleId ?? selectedModule.id;
         setProcessing(true);
         setLessonErrors({});
         setFeedback(null);
@@ -273,15 +565,12 @@ export default function Index({ courses, lessonTypes }) {
             payload.append('position', String(Number(lessonForm.position)));
             payload.append('lesson_type_id', String(Number(lessonForm.lesson_type_id)));
             payload.append('is_published', lessonForm.is_published ? '1' : '0');
-            payload.append('existing_file_path', lessonForm.existing_file_path || '');
-
-            if (lessonForm.lesson_file instanceof File) {
-                payload.append('lesson_file', lessonForm.lesson_file);
-            }
+            lessonForm.lesson_files.forEach((file) => payload.append('lesson_files[]', file));
+            lessonForm.deleted_file_ids.forEach((fileId) => payload.append('deleted_file_ids[]', String(fileId)));
 
             const response = lessonAction.mode === 'edit' && lessonAction.item
                 ? await axios.post(
-                    route('admin.lms.courses.modules.lessons.update', [selectedCourse.id, selectedModule.id, lessonAction.item.id]),
+                    route('admin.lms.courses.modules.lessons.update', [selectedCourse.id, targetModuleId, lessonAction.item.id]),
                     (() => {
                         payload.append('_method', 'put');
                         return payload;
@@ -289,7 +578,7 @@ export default function Index({ courses, lessonTypes }) {
                     { headers: { 'Content-Type': 'multipart/form-data' } },
                 )
                 : await axios.post(
-                    route('admin.lms.courses.modules.lessons.store', [selectedCourse.id, selectedModule.id]),
+                    route('admin.lms.courses.modules.lessons.store', [selectedCourse.id, targetModuleId]),
                     payload,
                     { headers: { 'Content-Type': 'multipart/form-data' } },
                 );
@@ -304,6 +593,52 @@ export default function Index({ courses, lessonTypes }) {
         } finally {
             setProcessing(false);
         }
+    };
+
+    const toggleLessonPublication = async (lesson, isPublished) => {
+        if (!selectedCourse || !selectedModule) return;
+
+        setPublishingLessonId(lesson.id);
+        setFeedback(null);
+
+        try {
+            const response = await axios.patch(
+                route('admin.lms.courses.modules.lessons.publication', [
+                    selectedCourse.id,
+                    selectedModule.id,
+                    lesson.id,
+                ]),
+                { is_published: isPublished },
+            );
+
+            reloadData(() => {
+                setFeedback({
+                    type: 'success',
+                    message: response?.data?.message ?? 'Le statut de publication a été mis à jour.',
+                });
+            });
+        } catch (error) {
+            setFeedback({
+                type: 'error',
+                message: resolveErrorMessage(error, 'Impossible de modifier la publication de la leçon.'),
+            });
+        } finally {
+            setPublishingLessonId(null);
+        }
+    };
+
+    const askDeleteLessonFile = (lessonFile) => {
+        setLessonForm((current) => ({
+            ...current,
+            deleted_file_ids: [...new Set([...current.deleted_file_ids, lessonFile.id])],
+        }));
+    };
+
+    const restoreLessonFile = (fileId) => {
+        setLessonForm((current) => ({
+            ...current,
+            deleted_file_ids: current.deleted_file_ids.filter((id) => id !== fileId),
+        }));
     };
 
     const askDeleteCourse = (course) => {
@@ -500,10 +835,10 @@ export default function Index({ courses, lessonTypes }) {
                 </form>
             </Modal>
 
-            <Modal show={lessonModalOpen} onClose={closeLessonModal} maxWidth="2xl">
-                <form onSubmit={submitLesson} className="space-y-5 p-6">
-                    <div>
-                        <h2 className="text-xl font-semibold text-dark-900">
+            <Modal show={lessonModalOpen} onClose={closeLessonModal} maxWidth="6xl">
+                <form onSubmit={submitLesson} className="flex max-h-[92vh] flex-col">
+                    <div className="shrink-0 border-b border-dark-100 px-6 py-5">
+                        <h2 className="text-2xl font-bold text-dark-900">
                             {lessonAction.mode === 'edit' ? 'Modifier la leçon' : 'Ajouter une leçon'}
                         </h2>
                         <p className="mt-1 text-sm text-dark-500">
@@ -511,84 +846,163 @@ export default function Index({ courses, lessonTypes }) {
                         </p>
                     </div>
 
-                    <div className="grid gap-4 sm:grid-cols-2">
-                        <FormInput
-                            label="Titre de la leçon"
-                            name="title"
-                            value={lessonForm.title}
-                            onChange={(event) => setLessonForm((current) => ({ ...current, title: event.target.value }))}
-                            error={lessonErrors.title}
-                            required
-                        />
-                        <FormSelect
-                            label="Type de leçon"
-                            name="lesson_type_id"
-                            value={lessonForm.lesson_type_id}
-                            onChange={(event) => setLessonForm((current) => ({ ...current, lesson_type_id: event.target.value }))}
-                            error={lessonErrors.lesson_type_id}
-                            required
-                        >
-                            <option value="">Sélectionner</option>
-                            {lessonTypes.map((type) => (
-                                <option key={type.id} value={type.id}>{type.name}</option>
-                            ))}
-                        </FormSelect>
-                        <FormInput
-                            label="Position"
-                            name="position"
-                            type="number"
-                            value={lessonForm.position}
-                            onChange={(event) => setLessonForm((current) => ({ ...current, position: event.target.value }))}
-                            error={lessonErrors.position}
-                            required
-                        />
-                        <FormInput
-                            label="Durée (minutes)"
-                            name="duration"
-                            type="number"
-                            value={lessonForm.duration}
-                            onChange={(event) => setLessonForm((current) => ({ ...current, duration: event.target.value }))}
-                            error={lessonErrors.duration}
-                        />
+                    <div className="grid min-h-0 flex-1 overflow-y-auto lg:grid-cols-[minmax(0,0.85fr)_minmax(0,1.15fr)]">
+                        <div className="space-y-5 border-b border-dark-100 p-6 lg:border-b-0 lg:border-r">
+                            <div>
+                                <h3 className="font-semibold text-dark-900">Informations de la leçon</h3>
+                                <p className="mt-1 text-xs text-dark-500">Renseignez les informations pédagogiques principales.</p>
+                            </div>
+                            <FormInput
+                                label="Titre de la leçon"
+                                name="title"
+                                value={lessonForm.title}
+                                onChange={(event) => setLessonForm((current) => ({ ...current, title: event.target.value }))}
+                                error={lessonErrors.title}
+                                required
+                            />
+                            <div className="grid gap-4 sm:grid-cols-2">
+                                <FormSelect
+                                    label="Type de leçon"
+                                    name="lesson_type_id"
+                                    value={lessonForm.lesson_type_id}
+                                    onChange={(event) => setLessonForm((current) => ({ ...current, lesson_type_id: event.target.value }))}
+                                    error={lessonErrors.lesson_type_id}
+                                    required
+                                >
+                                    <option value="">Sélectionner</option>
+                                    {lessonTypes.map((type) => (
+                                        <option key={type.id} value={type.id}>{type.name}</option>
+                                    ))}
+                                </FormSelect>
+                                <FormInput
+                                    label="Position"
+                                    name="position"
+                                    type="number"
+                                    value={lessonForm.position}
+                                    onChange={(event) => setLessonForm((current) => ({ ...current, position: event.target.value }))}
+                                    error={lessonErrors.position}
+                                    required
+                                />
+                            </div>
+                            <FormInput
+                                label="Durée (minutes)"
+                                name="duration"
+                                type="number"
+                                value={lessonForm.duration}
+                                onChange={(event) => setLessonForm((current) => ({ ...current, duration: event.target.value }))}
+                                error={lessonErrors.duration}
+                            />
+                            <FormTextarea
+                                label="Description"
+                                name="description"
+                                value={lessonForm.description}
+                                onChange={(event) => setLessonForm((current) => ({ ...current, description: event.target.value }))}
+                                error={lessonErrors.description}
+                                rows={5}
+                            />
+                            <label className="flex items-center gap-3 rounded-xl border border-dark-200 bg-dark-50 px-4 py-3 text-sm text-dark-700">
+                                <input
+                                    type="checkbox"
+                                    checked={lessonForm.is_published}
+                                    onChange={(event) => setLessonForm((current) => ({ ...current, is_published: event.target.checked }))}
+                                    className="rounded border-dark-300 text-emerald-600 focus:ring-emerald-500"
+                                />
+                                Publier immédiatement cette leçon
+                            </label>
+                            {lessonErrors.is_published && <p className="text-sm text-red-600">{lessonErrors.is_published}</p>}
+                        </div>
+
+                        <div className="min-w-0 space-y-5 bg-slate-50/60 p-6">
+                            <div>
+                                <h3 className="font-semibold text-dark-900">Fichiers et médias</h3>
+                                <p className="mt-1 text-xs text-dark-500">Ajoutez jusqu’à 4 fichiers par envoi, 500 Mo maximum par fichier.</p>
+                            </div>
+                            <label className="flex cursor-pointer flex-col items-center justify-center rounded-2xl border-2 border-dashed border-emerald-200 bg-white px-6 py-8 text-center transition hover:border-emerald-400 hover:bg-emerald-50/40">
+                                <PlusIcon className="h-8 w-8 text-emerald-600" />
+                                <span className="mt-2 text-sm font-semibold text-emerald-700">Choisir des fichiers</span>
+                                <span className="mt-1 text-xs text-dark-500">Images, vidéos, audios ou PDF</span>
+                                <input
+                                    type="file"
+                                    multiple
+                                    accept="image/*,video/*,audio/*,application/pdf"
+                                    onChange={handleLessonFileChange}
+                                    className="sr-only"
+                                />
+                            </label>
+                            {(lessonErrors.lesson_files || lessonErrors['lesson_files.0']) && (
+                                <p className="text-sm text-red-600">
+                                    {lessonErrors.lesson_files || lessonErrors['lesson_files.0']}
+                                </p>
+                            )}
+                            {lessonForm.deleted_file_ids.length > 0 && (
+                                <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-xs text-amber-800">
+                                    <p className="font-semibold">
+                                        {lessonForm.deleted_file_ids.length} fichier(s) seront supprimés avec « Mettre à jour ».
+                                    </p>
+                                    <div className="mt-2 space-y-1">
+                                        {deletedEditingFiles.map((file) => (
+                                            <div key={file.id} className="flex items-center justify-between gap-3">
+                                                <span className="truncate">{file.original_name}</span>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => restoreLessonFile(file.id)}
+                                                    className="shrink-0 font-semibold text-amber-900 underline"
+                                                >
+                                                    Restaurer
+                                                </button>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
+
+                            <div className="max-h-[52vh] space-y-4 overflow-y-auto pr-2">
+                                {lessonFilePreviews.length > 0 && (
+                                    <div className="space-y-3">
+                                        <p className="text-sm font-semibold text-emerald-700">
+                                            Nouveaux fichiers ({lessonFilePreviews.length})
+                                        </p>
+                                        {lessonFilePreviews.map((preview) => (
+                                            <div key={`${preview.file.name}-${preview.file.lastModified}`} className="rounded-2xl border border-emerald-100 bg-white p-3">
+                                                <div className="mb-2 flex items-center justify-between gap-3">
+                                                    <p className="truncate text-xs font-medium text-dark-600">{preview.file.name}</p>
+                                                    <button type="button" onClick={() => removePendingLessonFile(preview.file)} className="inline-flex shrink-0 items-center text-xs font-semibold text-red-600 hover:text-red-700">
+                                                        <TrashIcon className="mr-1 h-4 w-4" /> Retirer
+                                                    </button>
+                                                </div>
+                                                <MediaPreview source={preview.url} mimeType={preview.file.type} />
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
+                                {lessonAction.mode === 'edit' && visibleEditingFiles.length > 0 && (
+                                    <div className="space-y-3">
+                                        <p className="text-sm font-semibold text-dark-700">
+                                            Fichiers enregistrés ({visibleEditingFiles.length})
+                                        </p>
+                                        {visibleEditingFiles.map((lessonFile) => (
+                                            <div key={lessonFile.id} className="rounded-2xl border border-dark-200 bg-white p-3">
+                                                <div className="mb-2 flex items-center justify-between gap-3">
+                                                    <p className="truncate text-xs font-medium text-dark-600">{lessonFile.original_name}</p>
+                                                    <button type="button" onClick={() => askDeleteLessonFile(lessonFile)} className="inline-flex shrink-0 items-center text-xs font-semibold text-red-600 hover:text-red-700">
+                                                        <TrashIcon className="mr-1 h-4 w-4" /> Supprimer
+                                                    </button>
+                                                </div>
+                                                <MediaPreview source={lessonFile.file_path} mimeType={lessonFile.mime_type ?? ''} />
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
+                                {!lessonFilePreviews.length && !visibleEditingFiles.length && (
+                                    <div className="rounded-2xl border border-dashed border-dark-200 bg-white px-5 py-10 text-center text-sm text-dark-400">
+                                        Aucun fichier sélectionné.
+                                    </div>
+                                )}
+                            </div>
+                        </div>
                     </div>
 
-                    <div>
-                        <label className="mb-1.5 block text-sm font-medium text-dark-700">Fichier de la lecon</label>
-                        <input
-                            type="file"
-                            onChange={(event) => setLessonForm((current) => ({ ...current, lesson_file: event.target.files?.[0] ?? null }))}
-                            className="block w-full rounded-xl border border-dark-300 bg-white px-4 py-3 text-sm text-dark-800 file:mr-4 file:rounded-lg file:border-0 file:bg-emerald-50 file:px-4 file:py-2 file:font-semibold file:text-emerald-700 hover:file:bg-emerald-100"
-                        />
-                        {lessonForm.lesson_file && (
-                            <p className="mt-2 text-xs text-emerald-700">Fichier selectionne: {lessonForm.lesson_file.name}</p>
-                        )}
-                        {!lessonForm.lesson_file && lessonForm.existing_file_path && (
-                            <p className="mt-2 break-all text-xs text-dark-500">Chemin actuel: {lessonForm.existing_file_path}</p>
-                        )}
-                        {lessonErrors.lesson_file && <p className="mt-2 text-sm text-red-600">{lessonErrors.lesson_file}</p>}
-                    </div>
-
-                    <FormTextarea
-                        label="Description"
-                        name="description"
-                        value={lessonForm.description}
-                        onChange={(event) => setLessonForm((current) => ({ ...current, description: event.target.value }))}
-                        error={lessonErrors.description}
-                        rows={4}
-                    />
-
-                    <label className="flex items-center gap-3 rounded-xl border border-dark-200 bg-dark-50 px-4 py-3 text-sm text-dark-700">
-                        <input
-                            type="checkbox"
-                            checked={lessonForm.is_published}
-                            onChange={(event) => setLessonForm((current) => ({ ...current, is_published: event.target.checked }))}
-                            className="rounded border-dark-300 text-emerald-600 focus:ring-emerald-500"
-                        />
-                        Publier immédiatement cette leçon
-                    </label>
-                    {lessonErrors.is_published && <p className="text-sm text-red-600">{lessonErrors.is_published}</p>}
-
-                    <div className="flex justify-end gap-3">
+                    <div className="flex shrink-0 justify-end gap-3 border-t border-dark-100 bg-white px-6 py-4">
                         <SecondaryButton onClick={closeLessonModal} disabled={processing}>Annuler</SecondaryButton>
                         <PrimaryButton type="submit" className={greenButtonClass} disabled={processing || !lessonTypes.length}>
                             {processing ? 'Enregistrement...' : lessonAction.mode === 'edit' ? 'Mettre à jour' : 'Créer la leçon'}
@@ -774,10 +1188,7 @@ export default function Index({ courses, lessonTypes }) {
                                                             <PencilSquareIcon className="mr-2 h-4 w-4" />
                                                             Modifier
                                                         </SecondaryButton>
-                                                        <SecondaryButton className="!rounded-xl" onClick={() => {
-                                                            setSelectedModuleId(module.id);
-                                                            openCreateLessonModal();
-                                                        }}>
+                                                        <SecondaryButton className="!rounded-xl" onClick={() => openCreateLessonModal(module)}>
                                                             <PlusIcon className="mr-2 h-4 w-4" />
                                                             Ajouter une leçon
                                                         </SecondaryButton>
@@ -796,25 +1207,25 @@ export default function Index({ courses, lessonTypes }) {
                                     </div>
                                 </section>
 
-                                <section className="rounded-3xl border border-dark-100 bg-white shadow-sm">
-                                    <div className="flex items-center justify-between border-b border-dark-100 px-6 py-5">
+                                <section className="rounded-3xl border border-dark-100 bg-white p-6 shadow-sm">
+                                    <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
                                         <div>
-                                            <h2 className="text-lg font-semibold text-dark-900">
-                                                {selectedModule ? `Leçons du module "${selectedModule.title}"` : 'Leçons'}
+                                            <h2 className="text-2xl font-bold text-dark-900">
+                                                Leçons du module
                                             </h2>
-                                            <p className="mt-1 text-sm text-dark-500">
-                                                {selectedModule ? 'Gérez le contenu détaillé du module sélectionné.' : 'Sélectionnez un module pour afficher ses leçons.'}
+                                            <p className="mt-1 text-base font-medium text-slate-500">
+                                                {selectedModule?.title || 'Sélectionnez un module'}
                                             </p>
                                         </div>
                                         {selectedModule && (
                                             <PrimaryButton className={greenButtonClass} onClick={openCreateLessonModal} disabled={!lessonTypes.length}>
-                                                <PlusIcon className="mr-2 h-4 w-4" />
-                                                Nouvelle leçon
+                                                <PlusIcon className="mr-2 h-5 w-5" />
+                                                Ajouter une leçon
                                             </PrimaryButton>
                                         )}
                                     </div>
 
-                                    <div className="p-4">
+                                    <div className="mt-7">
                                         {!selectedModule ? (
                                             <div className="rounded-2xl border border-dashed border-dark-200 px-5 py-10 text-center text-sm text-dark-500">
                                                 Sélectionnez un module pour consulter ou gérer ses leçons.
@@ -824,11 +1235,17 @@ export default function Index({ courses, lessonTypes }) {
                                                 Aucune leçon n’a encore été ajoutée à ce module.
                                             </div>
                                         ) : (
-                                            <div className="space-y-3">
+                                            <div className="space-y-5">
                                                 {selectedModule.lessons.map((lesson) => (
-                                                    <div key={lesson.id} className="rounded-2xl border border-dark-100 bg-white p-5">
-                                                        <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-                                                            <div>
+                                                    <article key={lesson.id} className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm transition hover:shadow-md">
+                                                        <div className="grid items-center gap-5 xl:grid-cols-[44px_58px_minmax(260px,1fr)_minmax(300px,420px)_190px]">
+                                                            <div className="hidden text-center text-2xl leading-none tracking-[-4px] text-slate-400 xl:block" aria-hidden="true">
+                                                                ⠿
+                                                            </div>
+                                                            <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-amber-100 text-lg font-bold text-amber-700">
+                                                                {lesson.position}
+                                                            </div>
+                                                            <div className="min-w-0">
                                                                 <div className="flex flex-wrap items-center gap-2">
                                                                     <span className="rounded-full bg-amber-100 px-3 py-1 text-xs font-semibold text-amber-700">
                                                                         Leçon {lesson.position}
@@ -843,32 +1260,60 @@ export default function Index({ courses, lessonTypes }) {
                                                                     }`}>
                                                                         {lesson.is_published ? 'Publiée' : 'Brouillon'}
                                                                     </span>
+                                                                    <label className="ml-1 inline-flex cursor-pointer items-center gap-2 rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-semibold text-slate-600 shadow-sm">
+                                                                        <input
+                                                                            type="checkbox"
+                                                                            checked={Boolean(lesson.is_published)}
+                                                                            disabled={publishingLessonId === lesson.id}
+                                                                            onChange={(event) => toggleLessonPublication(lesson, event.target.checked)}
+                                                                            className="rounded border-slate-300 text-emerald-600 focus:ring-emerald-500 disabled:opacity-50"
+                                                                        />
+                                                                        {publishingLessonId === lesson.id
+                                                                            ? 'Enregistrement...'
+                                                                            : 'Rendre publique'}
+                                                                    </label>
                                                                 </div>
                                                                 <h3 className="mt-3 text-lg font-semibold text-dark-900">{lesson.title}</h3>
                                                                 <p className="mt-2 text-sm text-dark-500">
                                                                     {lesson.description || 'Aucune description'}
                                                                 </p>
-                                                                <div className="mt-3 flex flex-wrap gap-4 text-xs text-dark-500">
-                                                                    <span>Durée: {lesson.duration || 'Non définie'}</span>
-                                                                    <span>Fichier: {lesson.file_path || 'Aucun chemin renseigné'}</span>
+                                                                <div className="mt-4 flex items-center gap-2 text-sm font-medium text-slate-500">
+                                                                    <ClockIcon className="h-5 w-5" />
+                                                                    <span>{lesson.duration ? `${lesson.duration} min` : 'Durée non définie'}</span>
                                                                 </div>
                                                             </div>
-                                                            <div className="flex flex-wrap gap-2">
-                                                                <SecondaryButton className="!rounded-xl" onClick={() => openEditLessonModal(lesson)}>
-                                                                    <PencilSquareIcon className="mr-2 h-4 w-4" />
-                                                                    Modifier
-                                                                </SecondaryButton>
-                                                                <button
-                                                                    type="button"
-                                                                    onClick={() => askDeleteLesson(lesson)}
-                                                                    className="inline-flex items-center rounded-xl border border-red-200 bg-red-50 px-4 py-2 text-xs font-semibold uppercase tracking-widest text-red-700 transition hover:bg-red-100"
-                                                                >
-                                                                    <TrashIcon className="mr-2 h-4 w-4" />
-                                                                    Supprimer
-                                                                </button>
+                                                            <div className="min-w-0">
+                                                                <LessonFilesCarousel files={lesson.files ?? []} />
+                                                            </div>
+                                                            <div className="relative flex items-center justify-end gap-3">
+                                                                    <SecondaryButton className="!rounded-xl !px-4 !py-3" onClick={() => openEditLessonModal(lesson)}>
+                                                                        <PencilSquareIcon className="mr-2 h-4 w-4" />
+                                                                        Modifier
+                                                                    </SecondaryButton>
+                                                                    <button
+                                                                        type="button"
+                                                                        onClick={() => setLessonMenuId((current) => current === lesson.id ? null : lesson.id)}
+                                                                        className="inline-flex h-11 w-11 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-600 shadow-sm transition hover:bg-slate-50"
+                                                                        aria-label="Actions de la leçon"
+                                                                    >
+                                                                        <EllipsisHorizontalIcon className="h-6 w-6" />
+                                                                    </button>
+                                                                    {lessonMenuId === lesson.id && (
+                                                                        <button
+                                                                            type="button"
+                                                                            onClick={() => {
+                                                                                setLessonMenuId(null);
+                                                                                askDeleteLesson(lesson);
+                                                                            }}
+                                                                            className="absolute right-0 top-14 z-10 inline-flex items-center rounded-xl border border-red-100 bg-white px-4 py-3 text-sm font-semibold text-red-600 shadow-lg hover:bg-red-50"
+                                                                        >
+                                                                            <TrashIcon className="mr-2 h-5 w-5" />
+                                                                            Supprimer
+                                                                        </button>
+                                                                    )}
                                                             </div>
                                                         </div>
-                                                    </div>
+                                                    </article>
                                                 ))}
                                             </div>
                                         )}
@@ -886,8 +1331,3 @@ export default function Index({ courses, lessonTypes }) {
         </AppLayout>
     );
 }
-
-
-
-
-

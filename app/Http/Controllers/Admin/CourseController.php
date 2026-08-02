@@ -79,7 +79,7 @@ class CourseController extends Controller
     private function modulesForCourse(Course $course)
     {
         return CourseModule::query()
-            ->with('lessons.lessonType')
+            ->with(['lessons.lessonType', 'lessons.files'])
             ->where('course_id', $course->id)
             ->orderBy('position')
             ->get();

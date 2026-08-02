@@ -14,7 +14,7 @@ class ModuleController extends Controller
     public function index(Course $course): JsonResponse
     {
         $modules = CourseModule::query()
-            ->with('lessons.lessonType')
+            ->with(['lessons.lessonType', 'lessons.files'])
             ->where('course_id', $course->id)
             ->orderBy('position')
             ->get();
@@ -57,7 +57,7 @@ class ModuleController extends Controller
     {
         abort_unless($module->course_id === $course->id, 404);
 
-        $module->load(['course', 'lessons.lessonType']);
+        $module->load(['course', 'lessons.lessonType', 'lessons.files']);
 
         return response()->json(['data' => $module]);
     }
