@@ -239,7 +239,7 @@ function MediaPreview({ source, mimeType = '', className = '' }) {
     const frameClass = `overflow-hidden rounded-2xl border border-dark-200 bg-dark-50 ${className}`;
 
     if (kind === 'image') {
-        return <div className={frameClass}><img src={url} alt="Aper\u00E7u de la leçon" className="h-64 w-full object-contain" /></div>;
+        return <div className={frameClass}><img src={url} alt="Aper\u00E7u de la leÃ§on" className="h-64 w-full object-contain" /></div>;
     }
 
     if (kind === 'video') {
@@ -267,7 +267,7 @@ function MediaPreview({ source, mimeType = '', className = '' }) {
                         className="mt-4 inline-flex items-center rounded-xl border border-dark-200 bg-white px-4 py-2 text-sm font-semibold text-dark-700 shadow-sm hover:bg-dark-50"
                     >
                         <ArrowDownTrayIcon className="mr-2 h-5 w-5" />
-                        Télécharger le PDF
+                        TÃ©lÃ©charger le PDF
                     </a>
                 </div>
             </div>
@@ -276,7 +276,7 @@ function MediaPreview({ source, mimeType = '', className = '' }) {
 
     return (
         <a href={url} target="_blank" rel="noreferrer" className={`${frameClass} block px-4 py-5 text-sm font-semibold text-emerald-700 hover:bg-emerald-50`}>
-            Ouvrir le contenu de la leçon
+            Ouvrir le contenu de la leÃ§on
         </a>
     );
 }
@@ -742,7 +742,7 @@ export default function Index({ courses, lessonTypes }) {
         } catch (error) {
             setFeedback({
                 type: 'error',
-                message: resolveErrorMessage(error, 'Impossible de modifier la publication de la leçon.'),
+                message: resolveErrorMessage(error, 'Impossible de modifier la publication de la leÃ§on.'),
             });
         } finally {
             setPublishingLessonId(null);
@@ -766,7 +766,7 @@ export default function Index({ courses, lessonTypes }) {
     const askDeleteCourse = (course) => {
         setConfirmState({
             title: 'Supprimer le cours',
-            message: `Voulez-vous vraiment supprimer "${course.name}" ? Les modules et les leçons associ\u00E9es seront \u00E9galement supprim\u00E9es.`,
+            message: `Voulez-vous vraiment supprimer "${course.name}" ? Les modules et les Leçons associ\u00E9es seront \u00E9galement supprim\u00E9es.`,
             onConfirm: async () => {
                 setProcessing(true);
                 try {
@@ -791,7 +791,7 @@ export default function Index({ courses, lessonTypes }) {
         if (!selectedCourse) return;
         setConfirmState({
             title: 'Supprimer le module',
-            message: `Voulez-vous vraiment supprimer "${module.title}" ? Les leçons de ce module seront \u00E9galement supprim\u00E9es.`,
+            message: `Voulez-vous vraiment supprimer "${module.title}" ? Les Leçons de ce module seront \u00E9galement supprim\u00E9es.`,
             onConfirm: async () => {
                 setProcessing(true);
                 try {
@@ -814,7 +814,7 @@ export default function Index({ courses, lessonTypes }) {
     const askDeleteLesson = (lesson) => {
         if (!selectedCourse || !selectedModule) return;
         setConfirmState({
-            title: 'Supprimer la leçon',
+            title: 'Supprimer la leÃ§on',
             message: `Voulez-vous vraiment supprimer "${lesson.title}" ?`,
             onConfirm: async () => {
                 setProcessing(true);
@@ -824,7 +824,7 @@ export default function Index({ courses, lessonTypes }) {
                     );
                     reloadData(() => {
                         setConfirmModalOpen(false);
-                        setFeedback({ type: 'success', message: response?.data?.message ?? 'La leçon a \u00E9t\u00E9 supprim\u00E9e avec succ\u00E8s.' });
+                        setFeedback({ type: 'success', message: response?.data?.message ?? 'La leÃ§on a \u00E9t\u00E9 supprim\u00E9e avec succ\u00E8s.' });
                     });
                 } catch (error) {
                     setFeedback({ type: 'error', message: resolveErrorMessage(error, 'Impossible d\u2019effectuer cette suppression.') });
@@ -878,7 +878,7 @@ export default function Index({ courses, lessonTypes }) {
                             {courseAction.mode === 'edit' ? 'Modifier le cours' : 'Ajouter un cours'}
                         </h2>
                         <p className="mt-1 text-sm text-dark-500">
-                            DÃ©finissez le libellÃ© principal et la description du cours.
+                            DÃƒÂ©finissez le libellÃƒÂ© principal et la description du cours.
                         </p>
                     </div>
 
@@ -961,7 +961,7 @@ export default function Index({ courses, lessonTypes }) {
                 <form onSubmit={submitLesson} className="flex max-h-[92vh] flex-col">
                     <div className="shrink-0 border-b border-dark-100 px-6 py-5">
                         <h2 className="text-2xl font-bold text-dark-900">
-                            {lessonAction.mode === 'edit' ? 'Modifier la leçon' : 'Ajouter une leçon'}
+                            {lessonAction.mode === 'edit' ? 'Modifier la leÃ§on' : 'Ajouter une leÃ§on'}
                         </h2>
                         <p className="mt-1 text-sm text-dark-500">
                             {selectedModule ? `Module concern\u00E9 : ${selectedModule.title}` : `S\u00E9lectionnez d\u2019abord un module.`}
@@ -971,11 +971,11 @@ export default function Index({ courses, lessonTypes }) {
                     <div className="grid min-h-0 flex-1 overflow-y-auto lg:grid-cols-[minmax(0,0.85fr)_minmax(0,1.15fr)]">
                         <div className="space-y-5 border-b border-dark-100 p-6 lg:border-b-0 lg:border-r">
                             <div>
-                                <h3 className="font-semibold text-dark-900">Informations de la leÃ§on</h3>
-                                <p className="mt-1 text-xs text-dark-500">Renseignez les informations pÃ©dagogiques principales.</p>
+                                <h3 className="font-semibold text-dark-900">Informations de la leÃƒÂ§on</h3>
+                                <p className="mt-1 text-xs text-dark-500">Renseignez les informations pÃƒÂ©dagogiques principales.</p>
                             </div>
                             <FormInput
-                                label="Titre de la leçon"
+                                label="Titre de la leÃ§on"
                                 name="title"
                                 value={lessonForm.title}
                                 onChange={(event) => setLessonForm((current) => ({ ...current, title: event.target.value }))}
@@ -984,14 +984,14 @@ export default function Index({ courses, lessonTypes }) {
                             />
                             <div className="grid gap-4 sm:grid-cols-2">
                                 <FormSelect
-                                    label="Type de leçon"
+                                    label="Type de leÃ§on"
                                     name="lesson_type_id"
                                     value={lessonForm.lesson_type_id}
                                     onChange={(event) => setLessonForm((current) => ({ ...current, lesson_type_id: event.target.value }))}
                                     error={lessonErrors.lesson_type_id}
                                     required
                                 >
-                                    <option value="">SÃ©lectionner</option>
+                                    <option value="">SÃƒÂ©lectionner</option>
                                     {lessonTypes.map((type) => (
                                         <option key={type.id} value={type.id}>{type.name}</option>
                                     ))}
@@ -1029,7 +1029,7 @@ export default function Index({ courses, lessonTypes }) {
                                     onChange={(event) => setLessonForm((current) => ({ ...current, is_published: event.target.checked }))}
                                     className="rounded border-dark-300 text-emerald-600 focus:ring-emerald-500"
                                 />
-                                Publier immÃ©diatement cette leÃ§on
+                                Publier immÃƒÂ©diatement cette leÃƒÂ§on
                             </label>
                             {lessonErrors.is_published && <p className="text-sm text-red-600">{lessonErrors.is_published}</p>}
                         </div>
@@ -1037,7 +1037,7 @@ export default function Index({ courses, lessonTypes }) {
                         <div className="min-w-0 space-y-5 bg-slate-50/60 p-6">
                             <div>
                                 <h3 className="font-semibold text-dark-900">{'Fichiers et m\u00E9dias'}</h3>
-                                <p className="mt-1 text-xs text-dark-500">Ajoutez jusqu'Ã  4 fichiers par envoi, 500 Mo maximum par fichier.</p>
+                                <p className="mt-1 text-xs text-dark-500">Ajoutez jusqu'ÃƒÂ  4 fichiers par envoi, 500 Mo maximum par fichier.</p>
                             </div>
                             <label className="flex cursor-pointer flex-col items-center justify-center rounded-2xl border-2 border-dashed border-emerald-200 bg-white px-6 py-8 text-center transition hover:border-emerald-400 hover:bg-emerald-50/40">
                                 <PlusIcon className="h-8 w-8 text-emerald-600" />
@@ -1059,7 +1059,7 @@ export default function Index({ courses, lessonTypes }) {
                             {lessonForm.deleted_file_ids.length > 0 && (
                                 <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-xs text-amber-800">
                                     <p className="font-semibold">
-                                        {lessonForm.deleted_file_ids.length} fichier(s) seront supprimÃ©s avec ? Mettre Ã  jour ?.
+                                        {lessonForm.deleted_file_ids.length} fichier(s) seront supprimÃƒÂ©s avec ? Mettre ÃƒÂ  jour ?.
                                     </p>
                                     <div className="mt-2 space-y-1">
                                         {deletedEditingFiles.map((file) => (
@@ -1117,7 +1117,7 @@ export default function Index({ courses, lessonTypes }) {
                                 )}
                                 {!lessonFilePreviews.length && !visibleEditingFiles.length && (
                                     <div className="rounded-2xl border border-dashed border-dark-200 bg-white px-5 py-10 text-center text-sm text-dark-400">
-                                        Aucun fichier sÃ©lectionnÃ©.
+                                        Aucun fichier sÃƒÂ©lectionnÃƒÂ©.
                                     </div>
                                 )}
                             </div>
@@ -1127,7 +1127,7 @@ export default function Index({ courses, lessonTypes }) {
                     <div className="flex shrink-0 justify-end gap-3 border-t border-dark-100 bg-white px-6 py-4">
                         <SecondaryButton onClick={closeLessonModal} disabled={processing}>Annuler</SecondaryButton>
                         <PrimaryButton type="submit" className={greenButtonClass} disabled={processing || !lessonTypes.length}>
-                            {processing ? 'Enregistrement...' : lessonAction.mode === 'edit' ? 'Mettre \u00E0 jour' : 'Cr\u00E9er la leçon'}
+                            {processing ? 'Enregistrement...' : lessonAction.mode === 'edit' ? 'Mettre \u00E0 jour' : 'Cr\u00E9er la leÃ§on'}
                         </PrimaryButton>
                     </div>
                 </form>
@@ -1175,7 +1175,7 @@ export default function Index({ courses, lessonTypes }) {
                         <div className="flex items-center justify-between border-b border-dark-100 px-6 py-5">
                             <div>
                                 <h2 className="text-lg font-semibold text-dark-900">Cours disponibles</h2>
-                                <p className="mt-1 text-sm text-dark-500">Choisissez un cours pour gÃ©rer sa structure.</p>
+                                <p className="mt-1 text-sm text-dark-500">Choisissez un cours pour gérer sa structure.</p>
                             </div>
                         </div>
 
@@ -1225,13 +1225,91 @@ export default function Index({ courses, lessonTypes }) {
                         {selectedCourse ? (
                             <>
                                 <section className="rounded-3xl border border-dark-100 bg-white p-6 shadow-sm">
+                                    <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+                                        <div>
+                                            <h2 className="text-2xl font-bold text-dark-900">{selectedCourse.name}</h2>
+                                            <p className="mt-2 max-w-3xl text-sm text-dark-500">
+                                                {selectedCourse.description || 'Aucune description pour ce cours.'}
+                                            </p>
+                                        </div>
+                                        <div className="rounded-2xl bg-dark-50 px-4 py-3 text-sm text-dark-600">
+                                            {selectedCourse.users_count} apprenant{selectedCourse.users_count > 1 ? 's' : ''} inscrit{selectedCourse.users_count > 1 ? 's' : ''}
+                                        </div>
+                                    </div>
+                                </section>
+
+                                <section className="rounded-3xl border border-dark-100 bg-white shadow-sm">
+                                    <div className="border-b border-dark-100 px-6 py-5">
+                                        <h2 className="text-xl font-semibold text-dark-900">{'Modules du cours'}</h2>
+                                        <p className="mt-1 text-sm text-dark-500">{'Gérez les modules du cours avant d’administrer leurs leçons.'}</p>
+                                    </div>
+                                    <div className="grid gap-4 p-4 lg:grid-cols-2">
+                                        {selectedCourse.modules.length === 0 ? (
+                                            <div className="rounded-2xl border border-dashed border-dark-200 px-5 py-10 text-center text-sm text-dark-500 lg:col-span-2">
+                                                {'Aucun module n’a encore été créé pour ce cours.'}
+                                            </div>
+                                        ) : selectedCourse.modules.map((module) => {
+                                            const isActive = module.id === selectedModuleId;
+
+                                            return (
+                                                <div
+                                                    key={module.id}
+                                                    className={`rounded-2xl border p-5 transition ${
+                                                        isActive
+                                                            ? 'border-blue-300 bg-blue-50'
+                                                            : 'border-dark-100 bg-white hover:border-blue-200'
+                                                    }`}
+                                                >
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => setSelectedModuleId(module.id)}
+                                                        className="w-full text-left"
+                                                    >
+                                                        <div className="flex items-start justify-between gap-3">
+                                                            <div>
+                                                                <p className="text-xs font-semibold uppercase tracking-[0.16em] text-blue-600">
+                                                                    {`Module ${module.position}`}
+                                                                </p>
+                                                                <h3 className="mt-1 text-lg font-semibold text-dark-900">{module.title}</h3>
+                                                                <p className="mt-2 line-clamp-3 text-sm text-dark-500">
+                                                                    {module.description || 'Aucune description'}
+                                                                </p>
+                                                            </div>
+                                                            <span className="rounded-full bg-white px-3 py-1 text-xs font-semibold text-dark-600 shadow-sm">
+                                                                {module.lessons.length} leçons
+                                                            </span>
+                                                        </div>
+                                                    </button>
+                                                    <div className="mt-4 flex flex-wrap gap-2">
+                                                        <SecondaryButton className="!rounded-xl" onClick={() => openEditModuleModal(module)}>
+                                                            <PencilSquareIcon className="mr-2 h-4 w-4" />
+                                                            Modifier le module
+                                                        </SecondaryButton>
+                                                        <SecondaryButton className="!rounded-xl" onClick={() => openCreateLessonModal(module)} disabled={!lessonTypes.length}>
+                                                            <PlusIcon className="mr-2 h-4 w-4" />
+                                                            Ajouter une leçon
+                                                        </SecondaryButton>
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => askDeleteModule(module)}
+                                                            className="inline-flex items-center rounded-xl border border-red-200 bg-red-50 px-4 py-2 text-sm font-semibold text-red-700 transition hover:bg-red-100"
+                                                        >
+                                                            <TrashIcon className="mr-2 h-4 w-4" />
+                                                            Supprimer
+                                                        </button>
+                                                    </div>
+                                                </div>
+                                            );
+                                        })}
+                                    </div>
+                                </section>
+
+                                <section className="rounded-3xl border border-dark-100 bg-white p-6 shadow-sm">
                                     <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
                                         <div>
-                                            <h2 className="text-2xl font-bold text-dark-900">
-                                                {'leçons du module'}
-                                            </h2>
+                                            <h2 className="text-2xl font-bold text-dark-900">{'Leçons du module'}</h2>
                                             <p className="mt-1 text-base font-medium text-slate-500">
-                                                {selectedModule?.title || 'S\u00e9lectionnez un module'}
+                                                {selectedModule?.title || 'Sélectionnez un module'}
                                             </p>
                                         </div>
                                         {selectedModule && (
@@ -1245,11 +1323,11 @@ export default function Index({ courses, lessonTypes }) {
                                     <div className="mt-7">
                                         {!selectedModule ? (
                                             <div className="rounded-2xl border border-dashed border-dark-200 px-5 py-10 text-center text-sm text-dark-500">
-                                                {'S\u00e9lectionnez un module pour consulter ou g\u00e9rer ses leçons.'}
+                                                {'Sélectionnez un module pour consulter ou gérer ses leçons.'}
                                             </div>
                                         ) : selectedModule.lessons.length === 0 ? (
                                             <div className="rounded-2xl border border-dashed border-dark-200 px-5 py-10 text-center text-sm text-dark-500">
-                                                {'Aucune leçon n\u2019a encore \u00e9t\u00e9 ajout\u00e9e \u00e0 ce module.'}
+                                                {'Aucune leçon n’a encore été ajoutée à ce module.'}
                                             </div>
                                         ) : (
                                             <div className="space-y-5">
@@ -1262,17 +1340,17 @@ export default function Index({ courses, lessonTypes }) {
                                                             <div className="min-w-0 xl:pr-2">
                                                                 <div className="flex flex-wrap items-center gap-2">
                                                                     <span className="rounded-full bg-amber-100 px-3 py-1 text-xs font-semibold text-amber-700">
-                                                                        {`leçon ${lesson.position}`}
+                                                                        {`Leçon ${lesson.position}`}
                                                                     </span>
                                                                     <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-600">
-                                                                        {lesson.lesson_type?.name || 'Type non d\u00e9fini'}
+                                                                        {lesson.lesson_type?.name || 'Type non défini'}
                                                                     </span>
                                                                     <span className={`rounded-full px-3 py-1 text-xs font-semibold ${
                                                                         lesson.is_published
                                                                             ? 'bg-emerald-100 text-emerald-700'
                                                                             : 'bg-slate-100 text-slate-600'
                                                                     }`}>
-                                                                        {lesson.is_published ? 'Publi\u00e9e' : 'Brouillon'}
+                                                                        {lesson.is_published ? 'Publiée' : 'Brouillon'}
                                                                     </span>
                                                                     <label className="ml-1 inline-flex cursor-pointer items-center gap-2 rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-semibold text-slate-600 shadow-sm">
                                                                         <input
@@ -1291,7 +1369,7 @@ export default function Index({ courses, lessonTypes }) {
                                                                 </p>
                                                                 <div className="mt-4 flex items-center gap-2 text-sm font-medium text-slate-500">
                                                                     <ClockIcon className="h-5 w-5" />
-                                                                    <span>{lesson.duration ? `${lesson.duration} min` : 'Dur\u00e9e non d\u00e9finie'}</span>
+                                                                    <span>{lesson.duration ? `${lesson.duration} min` : 'Durée non définie'}</span>
                                                                 </div>
                                                             </div>
                                                             <div className="min-w-0 space-y-4">
@@ -1334,7 +1412,7 @@ export default function Index({ courses, lessonTypes }) {
                             </>
                         ) : (
                             <div className="rounded-3xl border border-dashed border-dark-200 bg-white px-6 py-16 text-center text-dark-500 shadow-sm">
-                                {'Cr\u00E9ez un premier cours pour commencer la structuration du contenu p\u00E9dagogique.'}
+                                {'Créez un premier cours pour commencer la structuration du contenu pédagogique.'}
                             </div>
                         )}
                     </div>
