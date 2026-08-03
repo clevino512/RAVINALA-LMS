@@ -15,6 +15,16 @@ import {
 } from '@heroicons/react/24/outline';
 import { useEffect, useMemo, useRef, useState } from 'react';
 
+const PLAYBACK_RATE_STORAGE_KEY = 'ravinala-media-playback-rate';
+const PLAYBACK_RATES = [0.25, 0.5, 0.75, 1, 1.25, 1.5, 1.75, 2, 2.5, 3];
+
+const savedPlaybackRate = () => {
+    if (typeof window === 'undefined') return 1;
+
+    const rate = Number(window.localStorage.getItem(PLAYBACK_RATE_STORAGE_KEY));
+    return PLAYBACK_RATES.includes(rate) ? rate : 1;
+};
+
 const publicMediaUrl = (path) => {
     if (!path) return null;
     if (/^(https?:|blob:|data:)/i.test(path)) return path;
@@ -22,7 +32,7 @@ const publicMediaUrl = (path) => {
     const normalizedPath = String(path).replace(/^\/+/, '');
 
     if (normalizedPath.startsWith('lessons/data/') || normalizedPath.startsWith('storage/')) {
-        return `/lesson-media?path=${encodeURIComponent(`/${normalizedPath.replace(/^storage\//, 'storage/')}`)}`;
+        return `/${normalizedPath}`;
     }
 
     return `/${normalizedPath.replace(/^storage\//, 'storage/')}`;
@@ -60,7 +70,7 @@ function MediaPlayer({ url, kind, frameClass }) {
     const [isPlaying, setIsPlaying] = useState(false);
     const [currentTime, setCurrentTime] = useState(0);
     const [duration, setDuration] = useState(0);
-    const [playbackRate, setPlaybackRate] = useState(1);
+    const [playbackRate, setPlaybackRate] = useState(savedPlaybackRate);
     const [volume, setVolume] = useState(1);
 
     useEffect(() => {
@@ -72,6 +82,8 @@ function MediaPlayer({ url, kind, frameClass }) {
             setDuration(media.duration || 0);
             setIsPlaying(!media.paused && !media.ended);
         };
+
+        media.playbackRate = playbackRate;
 
         syncState();
 
@@ -88,7 +100,7 @@ function MediaPlayer({ url, kind, frameClass }) {
             media.removeEventListener('pause', syncState);
             media.removeEventListener('ended', syncState);
         };
-    }, [url]);
+    }, [url, playbackRate]);
 
     const togglePlayback = async () => {
         const media = mediaRef.current;
@@ -128,14 +140,16 @@ function MediaPlayer({ url, kind, frameClass }) {
         if (media) {
             media.playbackRate = nextRate;
         }
+
+        window.localStorage.setItem(PLAYBACK_RATE_STORAGE_KEY, String(nextRate));
     };
 
     return (
         <div className={`${frameClass} ${kind === 'video' ? 'bg-black' : 'p-4'}`}>
             {kind === 'video' ? (
-                <video ref={mediaRef} src={url} preload="metadata" className="max-h-80 w-full" />
+                <video ref={mediaRef} src={url} preload="metadata" controls className="max-h-80 w-full" />
             ) : (
-                <audio ref={mediaRef} src={url} preload="metadata" className="hidden" />
+                <audio ref={mediaRef} src={url} preload="metadata" controls className="w-full" />
             )}
             <div className={`space-y-3 ${kind === 'video' ? 'border-t border-white/10 bg-slate-950 p-4 text-white' : ''}`}>
                 <div className="flex flex-wrap items-center gap-3">
@@ -176,14 +190,17 @@ function MediaPlayer({ url, kind, frameClass }) {
                             aria-label="Volume"
                         />
                     </div>
-                    <select
-                        value={playbackRate}
-                        onChange={changePlaybackRate}
-                        className={`rounded-lg border px-2 py-1 text-sm ${kind === 'video' ? 'border-white/20 bg-slate-800 text-white' : 'border-slate-200 bg-white text-slate-700'}`}
-                        aria-label="Vitesse de lecture"
-                    >
-                        {[0.5, 0.75, 1, 1.25, 1.5, 1.75, 2].map((rate) => <option key={rate} value={rate}>{rate}x</option>)}
-                    </select>
+                    <label className="flex items-center gap-2 text-sm font-medium">
+                        <span>Vitesse</span>
+                        <select
+                            value={playbackRate}
+                            onChange={changePlaybackRate}
+                            className={`rounded-lg border px-2 py-1 text-sm ${kind === 'video' ? 'border-white/20 bg-slate-800 text-white' : 'border-slate-200 bg-white text-slate-700'}`}
+                            aria-label="Vitesse de lecture"
+                        >
+                            {PLAYBACK_RATES.map((rate) => <option key={rate} value={rate}>{rate}×</option>)}
+                        </select>
+                    </label>
                 </div>
             </div>
         </div>

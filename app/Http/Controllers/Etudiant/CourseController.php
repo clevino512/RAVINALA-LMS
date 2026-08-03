@@ -94,7 +94,7 @@ class CourseController extends Controller
         });
 
         return response()->json([
-            'message' => 'La progression de la leÃ§on a Ã©tÃ© enregistrÃ©e avec succÃ¨s.',
+            'message' => 'La progression de la leçon a été enregistrée avec succès.',
         ]);
     }
 

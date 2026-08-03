@@ -41,6 +41,15 @@ const emptyLessonForm = {
 
 const greenButtonClass = '!rounded-xl !border !border-emerald-700 !bg-gradient-to-r !from-[#2d8b46] !to-[#24763a] !px-5 !py-3 !text-sm !font-semibold !text-white !shadow-[0_14px_26px_rgba(45,139,70,0.22)] hover:!from-[#25753b] hover:!to-[#1f6331]';
 const maxLessonFileSize = 500 * 1024 * 1024;
+const PLAYBACK_RATE_STORAGE_KEY = 'ravinala-media-playback-rate';
+const PLAYBACK_RATES = [0.25, 0.5, 0.75, 1, 1.25, 1.5, 1.75, 2, 2.5, 3];
+
+const savedPlaybackRate = () => {
+    if (typeof window === 'undefined') return 1;
+
+    const rate = Number(window.localStorage.getItem(PLAYBACK_RATE_STORAGE_KEY));
+    return PLAYBACK_RATES.includes(rate) ? rate : 1;
+};
 
 const publicMediaUrl = (path) => {
     if (!path) return null;
@@ -49,7 +58,7 @@ const publicMediaUrl = (path) => {
     const normalizedPath = String(path).replace(/^\/+/, '');
 
     if (normalizedPath.startsWith('lessons/data/') || normalizedPath.startsWith('storage/')) {
-        return `/lesson-media?path=${encodeURIComponent(`/${normalizedPath.replace(/^storage\//, 'storage/')}`)}`;
+        return `/${normalizedPath}`;
     }
 
     return `/${normalizedPath.replace(/^storage\//, 'storage/')}`;
@@ -87,7 +96,7 @@ function MediaPlayer({ url, kind, frameClass }) {
     const [isPlaying, setIsPlaying] = useState(false);
     const [currentTime, setCurrentTime] = useState(0);
     const [duration, setDuration] = useState(0);
-    const [playbackRate, setPlaybackRate] = useState(1);
+    const [playbackRate, setPlaybackRate] = useState(savedPlaybackRate);
     const [volume, setVolume] = useState(1);
 
     useEffect(() => {
@@ -99,6 +108,8 @@ function MediaPlayer({ url, kind, frameClass }) {
             setDuration(media.duration || 0);
             setIsPlaying(!media.paused && !media.ended);
         };
+
+        media.playbackRate = playbackRate;
 
         syncState();
 
@@ -115,7 +126,7 @@ function MediaPlayer({ url, kind, frameClass }) {
             media.removeEventListener('pause', syncState);
             media.removeEventListener('ended', syncState);
         };
-    }, [url]);
+    }, [url, playbackRate]);
 
     const togglePlayback = async () => {
         const media = mediaRef.current;
@@ -155,14 +166,16 @@ function MediaPlayer({ url, kind, frameClass }) {
         if (media) {
             media.playbackRate = nextRate;
         }
+
+        window.localStorage.setItem(PLAYBACK_RATE_STORAGE_KEY, String(nextRate));
     };
 
     return (
         <div className={`${frameClass} ${kind === 'video' ? 'bg-black' : 'p-4'}`}>
             {kind === 'video' ? (
-                <video ref={mediaRef} src={url} preload="metadata" className="max-h-80 w-full" />
+                <video ref={mediaRef} src={url} preload="metadata" controls className="aspect-video w-full bg-black object-contain" />
             ) : (
-                <audio ref={mediaRef} src={url} preload="metadata" className="hidden" />
+                <audio ref={mediaRef} src={url} preload="metadata" controls className="w-full" />
             )}
             <div className={`space-y-3 ${kind === 'video' ? 'border-t border-white/10 bg-slate-950 p-4 text-white' : ''}`}>
                 <div className="flex flex-wrap items-center gap-3">
@@ -172,7 +185,7 @@ function MediaPlayer({ url, kind, frameClass }) {
                             void togglePlayback();
                         }}
                         className={`inline-flex h-11 w-11 items-center justify-center rounded-full ${kind === 'video' ? 'bg-white/10 text-white hover:bg-white/20' : 'bg-slate-900 text-white hover:bg-slate-700'}`}
-                        aria-label={isPlaying ? 'Mettre en pause' : 'Lire le mÃ©dia'}
+                        aria-label={isPlaying ? 'Mettre en pause' : 'Lire le média'}
                     >
                         {isPlaying ? <PauseIcon className="h-5 w-5" /> : <PlayIcon className="h-5 w-5" />}
                     </button>
@@ -188,7 +201,7 @@ function MediaPlayer({ url, kind, frameClass }) {
                         onInput={handleSeek}
                         onChange={handleSeek}
                         className="h-2 min-w-[180px] flex-1 cursor-pointer accent-emerald-600"
-                        aria-label="Avancer ou reculer dans le mÃ©dia"
+                        aria-label="Avancer ou reculer dans le média"
                     />
                     <div className="flex items-center gap-2">
                         <SpeakerWaveIcon className={`h-5 w-5 ${kind === 'video' ? 'text-white' : 'text-slate-500'}`} />
@@ -203,14 +216,17 @@ function MediaPlayer({ url, kind, frameClass }) {
                             aria-label="Volume"
                         />
                     </div>
-                    <select
-                        value={playbackRate}
-                        onChange={changePlaybackRate}
-                        className={`rounded-lg border px-2 py-1 text-sm ${kind === 'video' ? 'border-white/20 bg-slate-800 text-white' : 'border-slate-200 bg-white text-slate-700'}`}
-                        aria-label="Vitesse de lecture"
-                    >
-                        {[0.5, 0.75, 1, 1.25, 1.5, 1.75, 2].map((rate) => <option key={rate} value={rate}>{rate}x</option>)}
-                    </select>
+                    <label className="flex items-center gap-2 text-sm font-medium">
+                        <span>Vitesse</span>
+                        <select
+                            value={playbackRate}
+                            onChange={changePlaybackRate}
+                            className={`rounded-lg border px-2 py-1 text-sm ${kind === 'video' ? 'border-white/20 bg-slate-800 text-white' : 'border-slate-200 bg-white text-slate-700'}`}
+                            aria-label="Vitesse de lecture"
+                        >
+                            {PLAYBACK_RATES.map((rate) => <option key={rate} value={rate}>{rate}×</option>)}
+                        </select>
+                    </label>
                 </div>
             </div>
         </div>
@@ -228,7 +244,7 @@ function MediaPreview({ source, mimeType = '', className = '' }) {
     const kind = mediaKind(source, mimeType);
     const frameClass = `overflow-hidden rounded-2xl border border-slate-200 bg-slate-50 ${className}`;
 
-    if (kind === 'image') return <div className={frameClass}><img src={url} alt="AperÃ§u de la leçon" className="h-64 w-full object-contain" /></div>;
+    if (kind === 'image') return <div className={frameClass}><img src={url} alt="Aperçu de la leçon" className="h-64 w-full object-contain" /></div>;
     if (kind === 'video') return <VideoPreview url={url} frameClass={frameClass} />;
     if (kind === 'audio') return <MediaPlayer url={url} kind="audio" frameClass={frameClass} />;
 
@@ -661,39 +677,45 @@ export default function Dashboard({ courses, lessonTypes, studentCount }) {
                                     <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
                                         <div>
                                             <h2 className="text-2xl font-bold text-slate-900">leçons du module</h2>
-                                            <p className="mt-1 text-base font-medium text-slate-500">{selectedModule?.title || 'SÃ©lectionnez un module'}</p>
+                                            <p className="mt-1 text-base font-medium text-slate-500">{selectedModule?.title || 'Sélectionnez un module'}</p>
                                         </div>
                                         {selectedModule && <PrimaryButton className={greenButtonClass} onClick={() => openCreateLessonModal(selectedModule)} disabled={!lessonTypes.length}><PlusIcon className="mr-2 h-5 w-5" />Ajouter une leçon</PrimaryButton>}
                                     </div>
 
                                     <div className="mt-7">
-                                        {!selectedModule ? <div className="rounded-2xl border border-dashed border-slate-200 px-5 py-10 text-center text-sm text-slate-500">SÃ©lectionnez un module pour consulter ou gérer ses leçons.</div> : selectedModule.lessons.length === 0 ? <div className="rounded-2xl border border-dashed border-slate-200 px-5 py-10 text-center text-sm text-slate-500">Aucune leçon na encore été ajoutÃ©e Ã  ce module.</div> : (
+                                        {!selectedModule ? <div className="rounded-2xl border border-dashed border-slate-200 px-5 py-10 text-center text-sm text-slate-500">Sélectionnez un module pour consulter ou gérer ses leçons.</div> : selectedModule.lessons.length === 0 ? <div className="rounded-2xl border border-dashed border-slate-200 px-5 py-10 text-center text-sm text-slate-500">Aucune leçon n’a encore été ajoutée à ce module.</div> : (
                                             <div className="space-y-5">
                                                 {selectedModule.lessons.map((lesson) => (
-                                                    <article key={lesson.id} className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm transition hover:shadow-md">
-                                                        <div className="grid gap-5 xl:grid-cols-[58px_minmax(0,1fr)_minmax(260px,340px)] xl:items-start">
-                                                            <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-amber-100 text-lg font-bold text-amber-700">{lesson.position}</div>
-                                                            <div className="min-w-0 xl:pr-2">
-                                                                <div className="flex flex-wrap items-center gap-2">
-                                                                    <span className="rounded-full bg-amber-100 px-3 py-1 text-xs font-semibold text-amber-700">leçon {lesson.position}</span>
-                                                                    <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-600">{lesson.lesson_type?.name || 'Type non dÃ©fini'}</span>
-                                                                    <span className={`rounded-full px-3 py-1 text-xs font-semibold ${lesson.is_published ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-600'}`}>{lesson.is_published ? 'Publiée' : 'Brouillon'}</span>
-                                                                    <label className="ml-1 inline-flex cursor-pointer items-center gap-2 rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-semibold text-slate-600 shadow-sm">
+                                                    <article key={lesson.id} className="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm transition hover:shadow-md">
+                                                        <div className="grid xl:grid-cols-[minmax(280px,0.8fr)_minmax(0,1.4fr)]">
+                                                            <div className="flex min-w-0 flex-col border-b border-slate-200 p-6 xl:border-b-0 xl:border-r">
+                                                                <div>
+                                                                    <div className="flex items-start gap-4">
+                                                                        <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-amber-100 text-lg font-bold text-amber-700">{lesson.position}</div>
+                                                                        <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2">
+                                                                            <span className="rounded-full bg-amber-100 px-3 py-1 text-xs font-semibold text-amber-700">leçon {lesson.position}</span>
+                                                                            <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-600">{lesson.lesson_type?.name || 'Type non défini'}</span>
+                                                                            <span className={`rounded-full px-3 py-1 text-xs font-semibold ${lesson.is_published ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-600'}`}>{lesson.is_published ? 'Publiée' : 'Brouillon'}</span>
+                                                                        </div>
+                                                                    </div>
+                                                                    <h3 className="mt-5 text-xl font-semibold text-slate-900">{lesson.title}</h3>
+                                                                    <p className="mt-3 text-sm leading-7 text-slate-500">{lesson.description || 'Aucune description'}</p>
+                                                                    <div className="mt-5 flex items-center gap-2 text-sm font-medium text-slate-500"><ClockIcon className="h-5 w-5" /><span>{lesson.duration ? `${lesson.duration} min` : 'Durée non définie'}</span></div>
+                                                                </div>
+                                                                <div className="mt-8 space-y-4 xl:mt-auto xl:pt-8">
+                                                                    <label className="inline-flex cursor-pointer items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-semibold text-slate-700 shadow-sm">
                                                                         <input type="checkbox" checked={Boolean(lesson.is_published)} disabled={publishingLessonId === lesson.id} onChange={(event) => toggleLessonPublication(lesson, event.target.checked)} className="rounded border-slate-300 text-emerald-600 focus:ring-emerald-500 disabled:opacity-50" />
                                                                         {publishingLessonId === lesson.id ? 'Enregistrement...' : 'Rendre publique'}
                                                                     </label>
+                                                                    <div className="relative flex flex-wrap items-center gap-3">
+                                                                        <SecondaryButton className="!rounded-xl !px-4 !py-3" onClick={() => openEditLessonModal(lesson)}><PencilSquareIcon className="mr-2 h-4 w-4" />Modifier</SecondaryButton>
+                                                                        <button type="button" onClick={() => setLessonMenuId((current) => (current === lesson.id ? null : lesson.id))} className="inline-flex h-11 w-11 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-600 shadow-sm transition hover:bg-slate-50" aria-label="Actions de la leçon"><EllipsisHorizontalIcon className="h-6 w-6" /></button>
+                                                                        {lessonMenuId === lesson.id && <button type="button" onClick={() => { setLessonMenuId(null); askDeleteLesson(lesson); }} className="absolute left-0 top-full z-10 mt-2 inline-flex items-center rounded-xl border border-red-100 bg-white px-4 py-3 text-sm font-semibold text-red-600 shadow-lg hover:bg-red-50"><TrashIcon className="mr-2 h-5 w-5" />Supprimer</button>}
+                                                                    </div>
                                                                 </div>
-                                                                <h3 className="mt-3 text-lg font-semibold text-slate-900">{lesson.title}</h3>
-                                                                <p className="mt-2 max-w-2xl text-sm leading-7 text-slate-500">{lesson.description || 'Aucune description'}</p>
-                                                                <div className="mt-4 flex items-center gap-2 text-sm font-medium text-slate-500"><ClockIcon className="h-5 w-5" /><span>{lesson.duration ? `${lesson.duration} min` : 'Durée non définie'}</span></div>
                                                             </div>
-                                                            <div className="min-w-0 space-y-4">
+                                                            <div className="min-w-0 bg-slate-50 p-4 sm:p-6">
                                                                 <LessonFilesCarousel files={lesson.files ?? []} />
-                                                                <div className="relative flex flex-wrap items-center gap-3">
-                                                                    <SecondaryButton className="!rounded-xl !px-4 !py-3" onClick={() => openEditLessonModal(lesson)}><PencilSquareIcon className="mr-2 h-4 w-4" />Modifier</SecondaryButton>
-                                                                    <button type="button" onClick={() => setLessonMenuId((current) => (current === lesson.id ? null : lesson.id))} className="inline-flex h-11 w-11 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-600 shadow-sm transition hover:bg-slate-50" aria-label="Actions de la leçon"><EllipsisHorizontalIcon className="h-6 w-6" /></button>
-                                                                    {lessonMenuId === lesson.id && <button type="button" onClick={() => { setLessonMenuId(null); askDeleteLesson(lesson); }} className="absolute left-0 top-full z-10 mt-2 inline-flex items-center rounded-xl border border-red-100 bg-white px-4 py-3 text-sm font-semibold text-red-600 shadow-lg hover:bg-red-50"><TrashIcon className="mr-2 h-5 w-5" />Supprimer</button>}
-                                                                </div>
                                                             </div>
                                                         </div>
                                                     </article>

@@ -51,6 +51,15 @@ const emptyLessonForm = {
 
 const greenButtonClass = '!rounded-xl !border !border-emerald-700 !bg-gradient-to-r !from-[#2d8b46] !to-[#24763a] !px-5 !py-3 !text-sm !font-semibold !text-white !shadow-[0_14px_26px_rgba(45,139,70,0.22)] hover:!from-[#25753b] hover:!to-[#1f6331]';
 const maxLessonFileSize = 500 * 1024 * 1024;
+const PLAYBACK_RATE_STORAGE_KEY = 'ravinala-media-playback-rate';
+const PLAYBACK_RATES = [0.25, 0.5, 0.75, 1, 1.25, 1.5, 1.75, 2, 2.5, 3];
+
+const savedPlaybackRate = () => {
+    if (typeof window === 'undefined') return 1;
+
+    const rate = Number(window.localStorage.getItem(PLAYBACK_RATE_STORAGE_KEY));
+    return PLAYBACK_RATES.includes(rate) ? rate : 1;
+};
 
 const publicMediaUrl = (path) => {
     if (!path) return null;
@@ -59,7 +68,7 @@ const publicMediaUrl = (path) => {
     const normalizedPath = String(path).replace(/^\/+/, '');
 
     if (normalizedPath.startsWith('lessons/data/') || normalizedPath.startsWith('storage/')) {
-        return `/lesson-media?path=${encodeURIComponent(`/${normalizedPath.replace(/^storage\//, 'storage/')}`)}`;
+        return `/${normalizedPath}`;
     }
 
     return `/${normalizedPath.replace(/^storage\//, 'storage/')}`;
@@ -97,7 +106,7 @@ function MediaPlayer({ url, kind, frameClass }) {
     const [isPlaying, setIsPlaying] = useState(false);
     const [currentTime, setCurrentTime] = useState(0);
     const [duration, setDuration] = useState(0);
-    const [playbackRate, setPlaybackRate] = useState(1);
+    const [playbackRate, setPlaybackRate] = useState(savedPlaybackRate);
     const [volume, setVolume] = useState(1);
 
     useEffect(() => {
@@ -109,6 +118,8 @@ function MediaPlayer({ url, kind, frameClass }) {
             setDuration(media.duration || 0);
             setIsPlaying(!media.paused && !media.ended);
         };
+
+        media.playbackRate = playbackRate;
 
         syncState();
 
@@ -125,7 +136,7 @@ function MediaPlayer({ url, kind, frameClass }) {
             media.removeEventListener('pause', syncState);
             media.removeEventListener('ended', syncState);
         };
-    }, [url]);
+    }, [url, playbackRate]);
 
     const togglePlayback = async () => {
         const media = mediaRef.current;
@@ -165,14 +176,16 @@ function MediaPlayer({ url, kind, frameClass }) {
         if (media) {
             media.playbackRate = nextRate;
         }
+
+        window.localStorage.setItem(PLAYBACK_RATE_STORAGE_KEY, String(nextRate));
     };
 
     return (
         <div className={`${frameClass} ${kind === 'video' ? 'bg-black' : 'p-4'}`}>
             {kind === 'video' ? (
-                <video ref={mediaRef} src={url} preload="metadata" className="max-h-80 w-full" />
+                <video ref={mediaRef} src={url} preload="metadata" controls className="max-h-80 w-full" />
             ) : (
-                <audio ref={mediaRef} src={url} preload="metadata" className="hidden" />
+                <audio ref={mediaRef} src={url} preload="metadata" controls className="w-full" />
             )}
             <div className={`space-y-3 ${kind === 'video' ? 'border-t border-white/10 bg-slate-950 p-4 text-white' : ''}`}>
                 <div className="flex flex-wrap items-center gap-3">
@@ -213,14 +226,17 @@ function MediaPlayer({ url, kind, frameClass }) {
                             aria-label="Volume"
                         />
                     </div>
-                    <select
-                        value={playbackRate}
-                        onChange={changePlaybackRate}
-                        className={`rounded-lg border px-2 py-1 text-sm ${kind === 'video' ? 'border-white/20 bg-slate-800 text-white' : 'border-slate-200 bg-white text-slate-700'}`}
-                        aria-label="Vitesse de lecture"
-                    >
-                        {[0.5, 0.75, 1, 1.25, 1.5, 1.75, 2].map((rate) => <option key={rate} value={rate}>{rate}x</option>)}
-                    </select>
+                    <label className="flex items-center gap-2 text-sm font-medium">
+                        <span>Vitesse</span>
+                        <select
+                            value={playbackRate}
+                            onChange={changePlaybackRate}
+                            className={`rounded-lg border px-2 py-1 text-sm ${kind === 'video' ? 'border-white/20 bg-slate-800 text-white' : 'border-slate-200 bg-white text-slate-700'}`}
+                            aria-label="Vitesse de lecture"
+                        >
+                            {PLAYBACK_RATES.map((rate) => <option key={rate} value={rate}>{rate}×</option>)}
+                        </select>
+                    </label>
                 </div>
             </div>
         </div>
@@ -267,7 +283,7 @@ function MediaPreview({ source, mimeType = '', className = '' }) {
                         className="mt-4 inline-flex items-center rounded-xl border border-dark-200 bg-white px-4 py-2 text-sm font-semibold text-dark-700 shadow-sm hover:bg-dark-50"
                     >
                         <ArrowDownTrayIcon className="mr-2 h-5 w-5" />
-                        TÃ©lÃ©charger  le PDF
+                        Télécharger le PDF
                     </a>
                 </div>
             </div>
@@ -991,7 +1007,7 @@ export default function Index({ courses, lessonTypes }) {
                                     error={lessonErrors.lesson_type_id}
                                     required
                                 >
-                                    <option value="">SÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â©lectionner</option>
+                                    <option value="">Sélectionner</option>
                                     {lessonTypes.map((type) => (
                                         <option key={type.id} value={type.id}>{type.name}</option>
                                     ))}
@@ -1315,7 +1331,7 @@ export default function Index({ courses, lessonTypes }) {
                                         <div>
                                             <h2 className="text-2xl font-bold text-dark-900">{'leçons du module'}</h2>
                                             <p className="mt-1 text-base font-medium text-slate-500">
-                                                {selectedModule?.title || 'SÃƒÆ’Ã‚Â©lectionnez un module'}
+                                                {selectedModule?.title || 'Sélectionnez un module'}
                                             </p>
                                         </div>
                                         {selectedModule && (
@@ -1329,7 +1345,7 @@ export default function Index({ courses, lessonTypes }) {
                                     <div className="mt-7">
                                         {!selectedModule ? (
                                             <div className="rounded-2xl border border-dashed border-dark-200 px-5 py-10 text-center text-sm text-dark-500">
-                                                {'SÃƒÆ’Ã‚Â©lectionnez un module pour consulter ou gérer ses leçons.'}
+                                                {'Sélectionnez un module pour consulter ou gérer ses leçons.'}
                                             </div>
                                         ) : selectedModule.lessons.length === 0 ? (
                                             <div className="rounded-2xl border border-dashed border-dark-200 px-5 py-10 text-center text-sm text-dark-500">
@@ -1349,7 +1365,7 @@ export default function Index({ courses, lessonTypes }) {
                                                                         {`leçon ${lesson.position}`}
                                                                     </span>
                                                                     <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-600">
-                                                                        {lesson.lesson_type?.name || 'Type non dÃƒÆ’Ã‚Â©fini'}
+                                                                        {lesson.lesson_type?.name || 'Type non défini'}
                                                                     </span>
                                                                     <span className={`rounded-full px-3 py-1 text-xs font-semibold ${
                                                                         lesson.is_published

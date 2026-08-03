@@ -155,9 +155,7 @@ class LessonController extends Controller
         $files = $request->file('lesson_files', []);
         $nextPosition = (int) $lesson->files()->max('position');
         $firstStoredPath = null;
-        $targetDirectory = public_path('lessons/data');
-
-        File::ensureDirectoryExists($targetDirectory);
+        $targetDirectory = 'lessons/data';
 
         foreach ($files as $uploadedFile) {
             $originalName = $uploadedFile->getClientOriginalName();
@@ -165,9 +163,8 @@ class LessonController extends Controller
             $fileSize = $uploadedFile->getSize();
             $storedFileName = $this->resolveStoredLessonFileName($targetDirectory, $originalName);
 
-            $uploadedFile->move($targetDirectory, $storedFileName);
-
-            $storedPath = '/lessons/data/' . $storedFileName;
+            $relativePath = $uploadedFile->storeAs($targetDirectory, $storedFileName, 'public');
+            $storedPath = Storage::url($relativePath);
             $firstStoredPath ??= $storedPath;
 
             $lesson->files()->create([
@@ -194,7 +191,7 @@ class LessonController extends Controller
         $candidate = $safeExtension !== '' ? "{$safeBaseName}.{$safeExtension}" : $safeBaseName;
         $counter = 1;
 
-        while (File::exists($targetDirectory . DIRECTORY_SEPARATOR . $candidate)) {
+        while (Storage::disk('public')->exists($targetDirectory . '/' . $candidate)) {
             $counter++;
             $candidate = $safeExtension !== '' ? "{$safeBaseName}-{$counter}.{$safeExtension}" : "{$safeBaseName}-{$counter}";
         }
