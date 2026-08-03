@@ -194,7 +194,11 @@ class CourseController extends Controller
 
         $completedModules = $finalModules->where('is_completed', true)->count();
         $modulesCount = $finalModules->count();
-        $courseProgressPercentage = $modulesCount === 0 ? 0 : round(($completedModules / max($modulesCount, 1)) * 100, 2);
+        $totalCourseLessons = $finalModules->sum('lessons_count');
+        $completedCourseLessons = $finalModules->sum('completed_lessons_count');
+        $courseProgressPercentage = $totalCourseLessons === 0
+            ? 0
+            : round(($completedCourseLessons / $totalCourseLessons) * 100, 2);
         $activeModule = $finalModules->firstWhere('is_current', true) ?? $finalModules->first();
 
         return [
@@ -202,10 +206,11 @@ class CourseController extends Controller
             'name' => $course->name,
             'description' => $course->description,
             'modules_count' => $modulesCount,
-            'lessons_count' => $finalModules->sum('lessons_count'),
+            'lessons_count' => $totalCourseLessons,
+            'completed_lessons_count' => $completedCourseLessons,
             'completed_modules_count' => $completedModules,
             'progress_percentage' => $courseProgressPercentage,
-            'is_completed' => $modulesCount > 0 && $completedModules === $modulesCount,
+            'is_completed' => $totalCourseLessons > 0 && $completedCourseLessons === $totalCourseLessons,
             'current_module_id' => $activeModule['id'] ?? null,
             'modules' => $finalModules,
         ];
@@ -249,6 +254,8 @@ class CourseController extends Controller
                 'id' => $module->id,
                 'is_completed' => $isCompleted,
                 'has_started' => $hasStarted,
+                'total_lessons' => $totalLessons,
+                'completed_lessons' => $completedLessons,
                 'progress_percentage' => $progressPercentage,
             ];
         }
@@ -275,14 +282,17 @@ class CourseController extends Controller
             $moduleProgress->save();
         }
 
-        $completedModules = collect($moduleSnapshots)->where('is_completed', true)->count();
-        $modulesCount = count($moduleSnapshots);
-        $courseProgress->progress_percentage = $modulesCount === 0 ? 0 : round(($completedModules / max($modulesCount, 1)) * 100, 2);
+        $totalCourseLessons = collect($moduleSnapshots)->sum('total_lessons');
+        $completedCourseLessons = collect($moduleSnapshots)->sum('completed_lessons');
+        $courseIsCompleted = $totalCourseLessons > 0 && $completedCourseLessons === $totalCourseLessons;
+        $courseProgress->progress_percentage = $totalCourseLessons === 0
+            ? 0
+            : round(($completedCourseLessons / $totalCourseLessons) * 100, 2);
         $courseProgress->started_at = $courseProgress->started_at ?: $now;
-        $courseProgress->progress_status_id = $modulesCount > 0 && $completedModules === $modulesCount
+        $courseProgress->progress_status_id = $courseIsCompleted
             ? $statusIds['completed']
             : ($courseProgress->progress_percentage > 0 ? $statusIds['in_progress'] : $statusIds['not_started']);
-        $courseProgress->completed_at = $modulesCount > 0 && $completedModules === $modulesCount ? ($courseProgress->completed_at ?: $now) : null;
+        $courseProgress->completed_at = $courseIsCompleted ? ($courseProgress->completed_at ?: $now) : null;
         $courseProgress->save();
     }
 

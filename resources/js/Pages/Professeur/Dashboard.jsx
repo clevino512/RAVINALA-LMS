@@ -1,6 +1,6 @@
 ﻿import AppLayout from '@/Layouts/AppLayout';
 import { Head, Link } from '@inertiajs/react';
-import { BookOpenIcon, Squares2X2Icon, UsersIcon, AcademicCapIcon } from '@heroicons/react/24/outline';
+import { AcademicCapIcon, BookOpenIcon, CheckCircleIcon, Squares2X2Icon, UsersIcon } from '@heroicons/react/24/outline';
 
 export default function Dashboard({ courses, stats }) {
     return (
@@ -68,19 +68,33 @@ export default function Dashboard({ courses, stats }) {
                                 <p className="mt-2 text-sm text-slate-500">{course.description || 'Aucune description'}</p>
                                 <div className="mt-4 flex flex-wrap gap-2 text-xs font-semibold text-slate-600">
                                     <span className="rounded-full bg-white px-3 py-1">{course.users_count} apprenants</span>
+                                    <span className="rounded-full bg-white px-3 py-1">{course.lessons_count} leçons publiées</span>
                                 </div>
-                                <div className="mt-4 space-y-2">
+                                <div className="mt-4 space-y-3">
                                     {course.students.length === 0 ? (
                                         <p className="text-sm text-slate-500">Aucun étudiant inscrit.</p>
-                                    ) : course.students.slice(0, 3).map((student) => (
-                                        <div key={student.id} className="flex items-center justify-between gap-3 rounded-xl bg-white px-3 py-2 text-sm">
-                                            <div className="min-w-0">
-                                                <p className="truncate font-medium text-slate-900">{student.name}</p>
-                                                <p className="truncate text-slate-500">{student.email || 'E-mail non renseigné'}</p>
+                                    ) : course.students.map((student) => (
+                                        <div key={student.id} className="rounded-xl bg-white px-4 py-3 text-sm shadow-sm">
+                                            <div className="flex items-start justify-between gap-4">
+                                                <div className="min-w-0">
+                                                    <p className="truncate font-medium text-slate-900">{student.name}</p>
+                                                    <p className="truncate text-slate-500">{student.email || 'E-mail non renseigné'}</p>
+                                                </div>
+                                                {student.is_completed ? (
+                                                    <span className="inline-flex shrink-0 items-center rounded-full bg-emerald-100 px-3 py-1 text-xs font-semibold text-emerald-700">
+                                                        <CheckCircleIcon className="mr-1 h-4 w-4" />Terminé
+                                                    </span>
+                                                ) : (
+                                                    <span className="shrink-0 font-bold text-emerald-700">{student.progress_percentage}%</span>
+                                                )}
                                             </div>
-                                            <span className="rounded-full bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-700">
-                                                {student.status?.name || 'Statut inconnu'}
-                                            </span>
+                                            <div className="mt-3 h-2 overflow-hidden rounded-full bg-slate-200">
+                                                <div className="h-full rounded-full bg-emerald-600 transition-all" style={{ width: `${student.progress_percentage}%` }} />
+                                            </div>
+                                            <div className="mt-2 flex items-center justify-between gap-3 text-xs text-slate-500">
+                                                <span>{student.completed_lessons_count}/{student.lessons_count} leçons validées</span>
+                                                <span>{student.status?.name || 'Statut inconnu'}</span>
+                                            </div>
                                         </div>
                                     ))}
                                 </div>

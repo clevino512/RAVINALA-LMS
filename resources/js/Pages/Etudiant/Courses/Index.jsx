@@ -4,7 +4,6 @@ import axios from 'axios';
 import {
     AcademicCapIcon,
     ArrowDownTrayIcon,
-    BookOpenIcon,
     CheckCircleIcon,
     ClockIcon,
     DocumentTextIcon,
@@ -332,14 +331,7 @@ export default function Index({ courses, stats, initialCourseId }) {
             <Head title="Cours" />
 
             <div className="space-y-6">
-                <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-                    <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
-                        <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-emerald-100 text-emerald-700">
-                            <BookOpenIcon className="h-7 w-7" />
-                        </div>
-                        <p className="mt-4 text-sm text-slate-500">Cours attribués</p>
-                        <p className="mt-1 text-4xl font-bold text-slate-900">{stats.totalCourses}</p>
-                    </div>
+                <section className="grid gap-4 md:grid-cols-3">
                     <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
                         <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-blue-100 text-blue-700">
                             <AcademicCapIcon className="h-7 w-7" />
