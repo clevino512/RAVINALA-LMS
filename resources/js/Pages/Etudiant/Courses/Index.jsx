@@ -4,6 +4,8 @@ import axios from 'axios';
 import {
     AcademicCapIcon,
     ArrowDownTrayIcon,
+    BookOpenIcon,
+    ChevronRightIcon,
     CheckCircleIcon,
     ClockIcon,
     DocumentTextIcon,
@@ -269,10 +271,11 @@ function LessonFiles({ files }) {
     );
 }
 
-export default function Index({ courses, stats, initialCourseId }) {
+export default function Index({ courses, initialCourseId }) {
     const initialCourse = courses.find((course) => course.id === initialCourseId) ?? courses[0];
     const [selectedCourseId, setSelectedCourseId] = useState(initialCourse?.id ?? null);
     const [selectedModuleId, setSelectedModuleId] = useState(initialCourse?.current_module_id ?? initialCourse?.modules?.[0]?.id ?? null);
+    const [selectedLessonId, setSelectedLessonId] = useState(null);
     const [markingLessonId, setMarkingLessonId] = useState(null);
 
     const selectedCourse = useMemo(
@@ -306,6 +309,20 @@ export default function Index({ courses, stats, initialCourseId }) {
         [selectedCourse, selectedModuleId],
     );
 
+    useEffect(() => {
+        if (!selectedModule?.lessons?.length) {
+            setSelectedLessonId(null);
+            return;
+        }
+
+        setSelectedLessonId((current) => {
+            const lessonStillExists = selectedModule.lessons.some((lesson) => lesson.id === current);
+            return lessonStillExists
+                ? current
+                : (selectedModule.lessons.find((lesson) => !lesson.is_completed)?.id ?? selectedModule.lessons[0].id);
+        });
+    }, [selectedModule]);
+
     const completeLesson = async (lesson) => {
         if (!selectedCourse || !selectedModule || lesson.is_completed) return;
 
@@ -313,7 +330,7 @@ export default function Index({ courses, stats, initialCourseId }) {
 
         try {
             await axios.patch(route('etudiant.courses.modules.lessons.complete', [selectedCourse.id, selectedModule.id, lesson.id]));
-            router.reload({ only: ['courses', 'stats'] });
+            router.reload({ only: ['courses'] });
         } finally {
             setMarkingLessonId(null);
         }
@@ -331,30 +348,6 @@ export default function Index({ courses, stats, initialCourseId }) {
             <Head title="Cours" />
 
             <div className="space-y-6">
-                <section className="grid gap-4 md:grid-cols-3">
-                    <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
-                        <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-blue-100 text-blue-700">
-                            <AcademicCapIcon className="h-7 w-7" />
-                        </div>
-                        <p className="mt-4 text-sm text-slate-500">Modules</p>
-                        <p className="mt-1 text-4xl font-bold text-slate-900">{stats.totalModules}</p>
-                    </div>
-                    <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
-                        <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-emerald-100 text-emerald-700">
-                            <CheckCircleIcon className="h-7 w-7" />
-                        </div>
-                        <p className="mt-4 text-sm text-slate-500">Modules terminés</p>
-                        <p className="mt-1 text-4xl font-bold text-slate-900">{stats.completedModules}</p>
-                    </div>
-                    <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
-                        <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-amber-100 text-amber-700">
-                            <ClockIcon className="h-7 w-7" />
-                        </div>
-                        <p className="mt-4 text-sm text-slate-500">Leçons validées</p>
-                        <p className="mt-1 text-4xl font-bold text-slate-900">{stats.completedLessons}</p>
-                    </div>
-                </section>
-
                 <section>
                     <div className="space-y-6">
                         {selectedCourse ? (
@@ -420,83 +413,99 @@ export default function Index({ courses, stats, initialCourseId }) {
                                     </div>
                                 </section>
 
-                                <section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
-                                    <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                                        <div>
-                                            <h2 className="text-2xl font-bold text-slate-900">Leçons du module</h2>
-                                            <p className="mt-1 text-base font-medium text-slate-500">{selectedModule?.title || 'Sélectionnez un module accessible'}</p>
-                                        </div>
-                                        {selectedModule && (
-                                            <div className="flex flex-wrap items-center gap-3">
-                                                <span className="rounded-full bg-slate-100 px-4 py-2 text-sm font-semibold text-slate-700">
-                                                    {selectedModule.lessons.length} leçon{selectedModule.lessons.length > 1 ? 's' : ''}
-                                                </span>
-                                                {selectedModule.is_completed && (
-                                                    <span className="inline-flex items-center rounded-full bg-emerald-100 px-4 py-2 text-sm font-semibold text-emerald-700">
-                                                        <CheckCircleIcon className="mr-2 h-5 w-5" />
-                                                        Module terminé
-                                                    </span>
-                                                )}
+                                <section className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_280px] xl:items-start">
+                                    <div className="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm">
+                                        <div className="flex flex-col gap-3 border-b border-slate-100 px-5 py-5 sm:flex-row sm:items-center sm:justify-between sm:px-6">
+                                            <div>
+                                                <h2 className="text-2xl font-bold text-slate-900">Leçons du module</h2>
+                                                <p className="mt-1 text-base font-medium text-slate-500">{selectedModule?.title || 'Sélectionnez un module accessible'}</p>
                                             </div>
+                                            {selectedModule && <span className="rounded-full bg-slate-100 px-4 py-2 text-sm font-semibold text-slate-700">{selectedModule.lessons.length} leçon{selectedModule.lessons.length > 1 ? 's' : ''}</span>}
+                                        </div>
+
+                                        {!selectedModule ? (
+                                            <div className="m-6 rounded-2xl border border-dashed border-slate-200 px-5 py-10 text-center text-sm text-slate-500">Aucun module accessible n'est sélectionné.</div>
+                                        ) : selectedModule.is_locked ? (
+                                            <div className="m-6 rounded-2xl border border-dashed border-slate-200 px-5 py-10 text-center text-sm text-slate-500">Terminez d'abord le module précédent pour débloquer celui-ci.</div>
+                                        ) : selectedModule.lessons.length === 0 ? (
+                                            <div className="m-6 rounded-2xl border border-dashed border-slate-200 px-5 py-10 text-center text-sm text-slate-500">Aucune leçon publiée pour ce module.</div>
+                                        ) : (
+                                            <>
+                                                <div className="divide-y divide-slate-100">
+                                                    {selectedModule.lessons.map((lesson) => {
+                                                        const lessonType = String(lesson.lesson_type?.name ?? '').toLowerCase();
+                                                        const isVideo = lessonType.includes('video') || lessonType.includes('vidéo');
+                                                        const isPdf = lessonType.includes('pdf');
+                                                        const actionLabel = isPdf ? 'Ouvrir le PDF' : isVideo ? 'Regarder' : 'Commencer';
+
+                                                        return (
+                                                            <div key={lesson.id}>
+                                                                <button type="button" onClick={() => setSelectedLessonId((current) => current === lesson.id ? null : lesson.id)} aria-expanded={selectedLessonId === lesson.id} className={`grid w-full grid-cols-[40px_44px_minmax(0,1fr)] items-center gap-3 px-4 py-4 text-left transition hover:bg-emerald-50/60 sm:grid-cols-[40px_44px_minmax(0,1fr)_auto_auto_20px] sm:px-6 ${selectedLessonId === lesson.id ? 'bg-emerald-50' : 'bg-white'}`}>
+                                                                    <span className={`flex h-9 w-9 items-center justify-center rounded-full text-sm font-bold ${lesson.is_completed ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'}`}>{lesson.position}</span>
+                                                                    <span className={`flex h-10 w-10 items-center justify-center rounded-xl border ${isVideo ? 'border-emerald-200 text-emerald-700' : isPdf ? 'border-red-200 text-red-600' : 'border-violet-200 text-violet-600'}`}>
+                                                                        {isVideo ? <PlayIcon className="h-5 w-5" /> : isPdf ? <DocumentTextIcon className="h-5 w-5" /> : <AcademicCapIcon className="h-5 w-5" />}
+                                                                    </span>
+                                                                    <span className="min-w-0">
+                                                                        <span className="block truncate font-semibold text-slate-900">{lesson.title}</span>
+                                                                        <span className="mt-1 block text-xs text-slate-500">{lesson.lesson_type?.name || 'Leçon'}{lesson.duration ? ` • ${lesson.duration} min` : ''}</span>
+                                                                    </span>
+                                                                    <span className={`col-start-3 row-start-2 w-fit rounded-full px-3 py-1 text-xs font-semibold sm:col-start-auto sm:row-start-auto ${lesson.is_completed ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'}`}>{lesson.is_completed ? 'Terminée' : 'À faire'}</span>
+                                                                    <span className="col-start-3 row-start-3 mt-1 inline-flex w-fit items-center rounded-lg border border-emerald-200 px-3 py-2 text-xs font-semibold text-emerald-700 sm:col-start-auto sm:row-start-auto sm:mt-0"><PlayIcon className="mr-2 h-4 w-4" />{actionLabel}</span>
+                                                                    <ChevronRightIcon className={`hidden h-5 w-5 text-slate-400 transition-transform sm:block ${selectedLessonId === lesson.id ? 'rotate-90' : ''}`} />
+                                                                </button>
+
+                                                                {selectedLessonId === lesson.id && (
+                                                                    <div className="border-t border-slate-200 bg-slate-50 p-4 sm:p-6">
+                                                                        <div className="rounded-2xl border border-slate-200 bg-white p-5">
+                                                                            <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+                                                                                <div>
+                                                                                    <p className="text-xs font-semibold uppercase tracking-[0.2em] text-emerald-600">Leçon {lesson.position}</p>
+                                                                                    <h3 className="mt-2 text-xl font-bold text-slate-900">{lesson.title}</h3>
+                                                                                    <p className="mt-2 text-sm leading-6 text-slate-500">{lesson.description || 'Aucune description'}</p>
+                                                                                </div>
+                                                                                <button type="button" onClick={() => completeLesson(lesson)} disabled={lesson.is_completed || markingLessonId === lesson.id} className={`inline-flex shrink-0 items-center justify-center rounded-xl px-4 py-3 text-sm font-semibold transition ${lesson.is_completed ? 'cursor-default border border-emerald-200 bg-emerald-50 text-emerald-700' : 'bg-emerald-600 text-white shadow-sm hover:bg-emerald-700 disabled:opacity-60'}`}>
+                                                                                    <CheckCircleIcon className="mr-2 h-5 w-5" />
+                                                                                    {lesson.is_completed ? 'Leçon validée' : markingLessonId === lesson.id ? 'Enregistrement...' : 'Marquer comme terminée'}
+                                                                                </button>
+                                                                            </div>
+                                                                            <div className="mt-5"><LessonFiles files={lesson.files ?? []} /></div>
+                                                                        </div>
+                                                                    </div>
+                                                                )}
+                                                            </div>
+                                                        );
+                                                    })}
+                                                </div>
+                                            </>
                                         )}
                                     </div>
 
-                                    <div className="mt-7">
-                                        {!selectedModule ? (
-                                            <div className="rounded-2xl border border-dashed border-slate-200 px-5 py-10 text-center text-sm text-slate-500">
-                                                Aucun module accessible n'est sélectionné.
+                                    {selectedCourse && (
+                                        <aside className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm xl:sticky xl:top-6">
+                                            <h2 className="text-lg font-bold text-slate-900">Ma progression</h2>
+                                            <div className="relative mx-auto mt-5 h-36 w-36">
+                                                <svg viewBox="0 0 100 100" className="h-full w-full -rotate-90" aria-hidden="true">
+                                                    <circle cx="50" cy="50" r="42" fill="none" stroke="currentColor" strokeWidth="8" className="text-slate-100" />
+                                                    <circle cx="50" cy="50" r="42" fill="none" stroke="currentColor" strokeWidth="8" strokeLinecap="round" strokeDasharray="263.89" strokeDashoffset={263.89 - (263.89 * selectedCourse.progress_percentage) / 100} className="text-emerald-600 transition-all duration-500" />
+                                                </svg>
+                                                <div className="absolute inset-0 flex items-center justify-center text-3xl font-bold text-slate-900">{selectedCourse.progress_percentage}%</div>
                                             </div>
-                                        ) : selectedModule.is_locked ? (
-                                            <div className="rounded-2xl border border-dashed border-slate-200 px-5 py-10 text-center text-sm text-slate-500">
-                                                Terminez d'abord le module précédent pour débloquer celui-ci.
+                                            <div className="mt-6 space-y-3">
+                                                <div className="flex items-center gap-3 rounded-2xl bg-emerald-50 p-3">
+                                                    <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-white text-emerald-700"><CheckCircleIcon className="h-6 w-6" /></span>
+                                                    <div><p className="font-bold text-slate-900">{selectedCourse.completed_lessons_count}/{selectedCourse.lessons_count}</p><p className="text-xs text-slate-500">leçons terminées</p></div>
+                                                </div>
+                                                <div className="flex items-center gap-3 rounded-2xl bg-blue-50 p-3">
+                                                    <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-white text-blue-700"><BookOpenIcon className="h-6 w-6" /></span>
+                                                    <div><p className="font-bold text-slate-900">{selectedCourse.completed_modules_count}/{selectedCourse.modules_count}</p><p className="text-xs text-slate-500">modules terminés</p></div>
+                                                </div>
+                                                <div className="flex items-center gap-3 rounded-2xl bg-amber-50 p-3">
+                                                    <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-white text-amber-700"><ClockIcon className="h-6 w-6" /></span>
+                                                    <div><p className="font-bold text-slate-900">{selectedModule?.completed_lessons_count ?? 0}/{selectedModule?.lessons_count ?? 0}</p><p className="text-xs text-slate-500">dans ce module</p></div>
+                                                </div>
                                             </div>
-                                        ) : selectedModule.lessons.length === 0 ? (
-                                            <div className="rounded-2xl border border-dashed border-slate-200 px-5 py-10 text-center text-sm text-slate-500">
-                                                Aucune leçon publiée pour ce module.
-                                            </div>
-                                        ) : (
-                                            <div className="space-y-5">
-                                                {selectedModule.lessons.map((lesson) => (
-                                                    <article key={lesson.id} className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm transition hover:shadow-md">
-                                                        <div className="grid gap-5 xl:grid-cols-[58px_minmax(0,1fr)_minmax(260px,340px)] xl:items-start">
-                                                            <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-amber-100 text-lg font-bold text-amber-700">
-                                                                {lesson.position}
-                                                            </div>
-                                                            <div className="min-w-0 xl:pr-2">
-                                                                <div className="flex flex-wrap items-center gap-2">
-                                                                    <span className="rounded-full bg-amber-100 px-3 py-1 text-xs font-semibold text-amber-700">Leçon {lesson.position}</span>
-                                                                    <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-600">{lesson.lesson_type?.name || 'Type non défini'}</span>
-                                                                    <span className={`rounded-full px-3 py-1 text-xs font-semibold ${lesson.is_completed ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'}`}>
-                                                                        {lesson.is_completed ? 'Terminée' : 'À faire'}
-                                                                    </span>
-                                                                </div>
-                                                                <h3 className="mt-3 text-lg font-semibold text-slate-900">{lesson.title}</h3>
-                                                                <p className="mt-2 max-w-2xl text-sm leading-7 text-slate-500">{lesson.description || 'Aucune description'}</p>
-                                                                <div className="mt-4 flex items-center gap-2 text-sm font-medium text-slate-500">
-                                                                    <ClockIcon className="h-5 w-5" />
-                                                                    <span>{lesson.duration ? `${lesson.duration} min` : 'Durée non définie'}</span>
-                                                                </div>
-                                                                <div className="mt-5">
-                                                                    <button
-                                                                        type="button"
-                                                                        onClick={() => completeLesson(lesson)}
-                                                                        disabled={lesson.is_completed || markingLessonId === lesson.id}
-                                                                        className={`inline-flex items-center rounded-xl px-4 py-3 text-sm font-semibold transition ${lesson.is_completed ? 'cursor-default border border-emerald-200 bg-emerald-50 text-emerald-700' : 'bg-emerald-600 text-white shadow-sm hover:bg-emerald-700 disabled:opacity-60'}`}
-                                                                    >
-                                                                        <CheckCircleIcon className="mr-2 h-5 w-5" />
-                                                                        {lesson.is_completed ? 'Leçon validée' : markingLessonId === lesson.id ? 'Enregistrement...' : 'Marquer comme terminée'}
-                                                                    </button>
-                                                                </div>
-                                                            </div>
-                                                            <div className="min-w-0 space-y-4">
-                                                                <LessonFiles files={lesson.files ?? []} />
-                                                            </div>
-                                                        </div>
-                                                    </article>
-                                                ))}
-                                            </div>
-                                        )}
-                                    </div>
+                                        </aside>
+                                    )}
                                 </section>
                             </>
                         ) : (
