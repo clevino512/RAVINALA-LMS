@@ -16,6 +16,8 @@ export default function Sidebar({ sidebarOpen, setSidebarOpen }) {
     const user = props.auth?.user;
     const userType = user?.user_type?.name?.toLocaleLowerCase('fr') ?? '';
     const isAdministrator = ['admin', 'administrateur'].includes(userType);
+    const isProfessor = ['professeur', 'teacher'].includes(userType);
+    const isStudent = ['étudiant', 'etudiant', 'student'].includes(userType);
     const navigation = [
         {
             name: 'Dashboard',
@@ -27,6 +29,16 @@ export default function Sidebar({ sidebarOpen, setSidebarOpen }) {
             ? [
                 { name: 'Utilisateurs', href: route('admin.users.index'), icon: UsersIcon, current: 'admin.users.*' },
                 { name: 'Cours', href: route('admin.lms.management'), icon: BookOpenIcon, current: 'admin.lms.*' },
+            ]
+            : []),
+        ...(isProfessor
+            ? [
+                { name: 'Cours', href: route('professeur.courses.index'), icon: BookOpenIcon, current: 'professeur.courses.*' },
+            ]
+            : []),
+        ...(isStudent
+            ? [
+                { name: 'Cours', href: route('etudiant.courses.index'), icon: BookOpenIcon, current: 'etudiant.courses.*' },
             ]
             : []),
     ];
@@ -99,8 +111,8 @@ export default function Sidebar({ sidebarOpen, setSidebarOpen }) {
                             </div>
                             <Link
                                 href={route('profile.edit')}
-                                title="Parametres du profil"
-                                aria-label="Parametres du profil"
+                                title="Paramètres du profil"
+                                aria-label="Paramètres du profil"
                                 className={`shrink-0 rounded-xl p-2 transition ${
                                     route().current('profile.*')
                                         ? 'bg-emerald-500/20 text-emerald-300'
@@ -118,7 +130,7 @@ export default function Sidebar({ sidebarOpen, setSidebarOpen }) {
                             className="mt-4 flex w-full items-center justify-center gap-2 rounded-2xl border border-emerald-400/18 bg-emerald-500/10 px-4 py-3 text-sm font-semibold text-emerald-50 transition hover:bg-emerald-500/20"
                         >
                             <ArrowRightOnRectangleIcon className="h-5 w-5 shrink-0" />
-                            Deconnexion
+                            Déconnexion
                         </Link>
                     </div>
                 </div>

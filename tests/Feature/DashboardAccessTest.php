@@ -40,7 +40,7 @@ class DashboardAccessTest extends TestCase
             ->assertForbidden();
     }
 
-    public function test_a_professor_sees_students_in_their_courses_and_cannot_manage_users(): void
+    public function test_a_professor_sees_their_dashboard_summary_and_cannot_manage_users(): void
     {
         $active = Status::factory()->create(['name' => 'actif']);
         $professorType = UserType::factory()->create(['name' => 'professeur']);
@@ -64,12 +64,33 @@ class DashboardAccessTest extends TestCase
             ->assertInertia(fn (Assert $page) => $page
                 ->component('Professeur/Dashboard')
                 ->has('courses', 1)
-                ->has('courses.0.users', 1)
-                ->where('courses.0.users.0.id', $student->id)
-                ->where('studentCount', 1));
+                ->has('courses.0.students', 1)
+                ->where('courses.0.students.0.id', $student->id)
+                ->where('stats.totalStudents', 1));
 
         $this->actingAs($professor)
             ->get(route('admin.users.index'))
             ->assertForbidden();
+    }
+
+    public function test_a_professor_can_open_the_dedicated_courses_section(): void
+    {
+        $active = Status::factory()->create(['name' => 'actif']);
+        $professorType = UserType::factory()->create(['name' => 'professeur']);
+        $professor = User::factory()->create([
+            'id_1' => $professorType->id,
+            'id_2' => $active->id,
+            'must_change_password' => false,
+        ]);
+        $course = Course::create(['name' => 'Français']);
+        $course->users()->attach($professor->id);
+
+        $this->actingAs($professor)
+            ->get(route('professeur.courses.index'))
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->component('Professeur/Courses/Index')
+                ->has('courses', 1)
+                ->where('courses.0.name', 'Français'));
     }
 }

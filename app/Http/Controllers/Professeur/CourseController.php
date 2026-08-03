@@ -1,23 +1,29 @@
 <?php
 
-namespace App\Http\Controllers\Admin;
+namespace App\Http\Controllers\Professeur;
 
 use App\Http\Controllers\Controller;
-use App\Models\Course;
 use App\Models\CourseModule;
 use App\Models\LessonType;
+use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Inertia\Response;
 
-class CourseManagementController extends Controller
+class CourseController extends Controller
 {
-    public function index(): Response
+    public function index(Request $request): Response
     {
-        $courses = Course::query()
-            ->with('users')
-            ->latest()
+        $courses = $request->user()
+            ->courses()
+            ->with([
+                'users' => fn ($query) => $query
+                    ->whereHas('userType', fn ($typeQuery) => $typeQuery->whereIn('name', ['étudiant', 'etudiant', 'student']))
+                    ->with('status')
+                    ->orderBy('first_name'),
+            ])
+            ->orderBy('name')
             ->get()
-            ->map(function (Course $course) {
+            ->map(function ($course) {
                 $modules = CourseModule::query()
                     ->with(['lessons.lessonType', 'lessons.files'])
                     ->where('course_id', $course->id)
@@ -29,8 +35,6 @@ class CourseManagementController extends Controller
                             'title' => $module->title,
                             'description' => $module->description,
                             'position' => $module->position,
-                            'created_at' => $module->created_at,
-                            'updated_at' => $module->updated_at,
                             'lessons' => $module->lessons->map(function ($lesson) {
                                 $files = $lesson->files->map(fn ($file) => [
                                     'id' => $file->id,
@@ -60,8 +64,6 @@ class CourseManagementController extends Controller
                                     'duration' => $lesson->duration,
                                     'position' => $lesson->position,
                                     'is_published' => $lesson->is_published,
-                                    'created_at' => $lesson->created_at,
-                                    'updated_at' => $lesson->updated_at,
                                     'lesson_type_id' => $lesson->lesson_type_id,
                                     'lesson_type' => $lesson->lessonType ? [
                                         'id' => $lesson->lessonType->id,
@@ -78,8 +80,6 @@ class CourseManagementController extends Controller
                     'id' => $course->id,
                     'name' => $course->name,
                     'description' => $course->description,
-                    'created_at' => $course->created_at,
-                    'updated_at' => $course->updated_at,
                     'users_count' => $course->users->count(),
                     'modules_count' => $modules->count(),
                     'lessons_count' => $modules->sum(fn ($module) => $module['lessons']->count()),
@@ -88,11 +88,16 @@ class CourseManagementController extends Controller
             })
             ->values();
 
-        return Inertia::render('Admin/Courses/Index', [
+        return Inertia::render('Professeur/Courses/Index', [
             'courses' => $courses,
-            'lessonTypes' => LessonType::query()
-                ->orderBy('name')
-                ->get(['id', 'name']),
+            'studentCount' => $request->user()
+                ->courses()
+                ->with(['users' => fn ($query) => $query->whereHas('userType', fn ($typeQuery) => $typeQuery->whereIn('name', ['étudiant', 'etudiant', 'student']))])
+                ->get()
+                ->flatMap->users
+                ->unique('id')
+                ->count(),
+            'lessonTypes' => LessonType::query()->orderBy('name')->get(['id', 'name']),
         ]);
     }
 }

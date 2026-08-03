@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Http\Controllers\Admin;
+namespace App\Http\Controllers\Professeur;
 
 use App\Http\Controllers\Controller;
 use App\Models\Course;
@@ -16,45 +16,21 @@ use Illuminate\Validation\Rule;
 
 class LessonController extends Controller
 {
-    public function index(Course $course, CourseModule $module): JsonResponse
-    {
-        abort_unless($module->course_id === $course->id, 404);
-
-        $lessons = Lesson::query()
-            ->with(['lessonType', 'files'])
-            ->where('module_id', $module->id)
-            ->orderBy('position')
-            ->get();
-
-        return response()->json([
-            'data' => $lessons,
-            'course' => $course,
-            'module' => $module,
-        ]);
-    }
-
     public function store(Request $request, Course $course, CourseModule $module): JsonResponse
     {
-        abort_unless($module->course_id === $course->id, 404);
+        $this->ensureProfessorAssignedToCourse($request, $course, $module);
 
         $validated = $request->validate([
             'title' => ['required', 'string', 'max:250'],
             'description' => ['nullable', 'string'],
             'lesson_files' => ['nullable', 'array', 'max:4'],
-            'lesson_files.*' => [
-                'nullable',
-                'file',
-                'mimetypes:image/*,video/*,audio/*,application/pdf',
-                'max:512000',
-            ],
+            'lesson_files.*' => ['nullable', 'file', 'mimetypes:image/*,video/*,audio/*,application/pdf', 'max:512000'],
             'duration' => ['nullable', 'numeric', 'min:0'],
             'position' => [
                 'nullable',
                 'integer',
                 'min:1',
-                Rule::unique('lessons', 'position')->where(
-                    fn ($query) => $query->where('module_id', $module->id)
-                ),
+                Rule::unique('lessons', 'position')->where(fn ($query) => $query->where('module_id', $module->id)),
             ],
             'is_published' => ['nullable', 'boolean'],
             'lesson_type_id' => ['required', 'exists:lesson_types,id'],
@@ -74,49 +50,31 @@ class LessonController extends Controller
         $this->storeLessonFiles($lesson, $request);
 
         return response()->json([
-            'message' => 'Lesson created successfully.',
+            'message' => 'La leçon a été créée avec succès.',
             'data' => $lesson->fresh()->load(['lessonType', 'module', 'files']),
         ], 201);
     }
 
-    public function show(Course $course, CourseModule $module, Lesson $lesson): JsonResponse
-    {
-        $this->ensureBelongsToModule($course, $module, $lesson);
-
-        $lesson->load(['lessonType', 'module.course', 'files']);
-
-        return response()->json(['data' => $lesson]);
-    }
-
     public function update(Request $request, Course $course, CourseModule $module, Lesson $lesson): JsonResponse
     {
-        $this->ensureBelongsToModule($course, $module, $lesson);
+        $this->ensureProfessorAssignedToCourse($request, $course, $module, $lesson);
 
         $validated = $request->validate([
             'title' => ['required', 'string', 'max:250'],
             'description' => ['nullable', 'string'],
             'lesson_files' => ['nullable', 'array', 'max:4'],
-            'lesson_files.*' => [
-                'nullable',
-                'file',
-                'mimetypes:image/*,video/*,audio/*,application/pdf',
-                'max:512000',
-            ],
+            'lesson_files.*' => ['nullable', 'file', 'mimetypes:image/*,video/*,audio/*,application/pdf', 'max:512000'],
             'deleted_file_ids' => ['nullable', 'array'],
             'deleted_file_ids.*' => [
                 'integer',
-                Rule::exists('lesson_files', 'id')->where(
-                    fn ($query) => $query->where('lesson_id', $lesson->id)
-                ),
+                Rule::exists('lesson_files', 'id')->where(fn ($query) => $query->where('lesson_id', $lesson->id)),
             ],
             'duration' => ['nullable', 'numeric', 'min:0'],
             'position' => [
                 'required',
                 'integer',
                 'min:1',
-                Rule::unique('lessons', 'position')
-                    ->ignore($lesson->id)
-                    ->where(fn ($query) => $query->where('module_id', $module->id)),
+                Rule::unique('lessons', 'position')->ignore($lesson->id)->where(fn ($query) => $query->where('module_id', $module->id)),
             ],
             'is_published' => ['required', 'boolean'],
             'lesson_type_id' => ['required', 'exists:lesson_types,id'],
@@ -144,72 +102,52 @@ class LessonController extends Controller
         $this->syncPrimaryLessonFilePath($lesson);
 
         return response()->json([
-            'message' => 'Lesson updated successfully.',
+            'message' => 'La leçon a été mise à jour avec succès.',
             'data' => $lesson->fresh()->load(['lessonType', 'module', 'files']),
         ]);
     }
 
     public function updatePublication(Request $request, Course $course, CourseModule $module, Lesson $lesson): JsonResponse
     {
-        $this->ensureBelongsToModule($course, $module, $lesson);
+        $this->ensureProfessorAssignedToCourse($request, $course, $module, $lesson);
 
         $validated = $request->validate([
             'is_published' => ['required', 'boolean'],
         ]);
 
-        $lesson->update([
-            'is_published' => $validated['is_published'],
-        ]);
+        $lesson->update(['is_published' => $validated['is_published']]);
 
         return response()->json([
-            'message' => $lesson->is_published
-                ? 'La lecon est maintenant publiee.'
-                : 'La lecon est maintenant en brouillon.',
+            'message' => $lesson->is_published ? 'La leçon est maintenant publiée.' : 'La leçon est maintenant en brouillon.',
             'data' => $lesson->fresh()->load('lessonType'),
         ]);
     }
 
-    public function destroy(Course $course, CourseModule $module, Lesson $lesson): JsonResponse
+    public function destroy(Request $request, Course $course, CourseModule $module, Lesson $lesson): JsonResponse
     {
-        $this->ensureBelongsToModule($course, $module, $lesson);
+        $this->ensureProfessorAssignedToCourse($request, $course, $module, $lesson);
 
         $lesson->load('files');
         $lesson->files->each(fn (LessonFile $file) => $this->deleteStoredLessonFile($file->file_path));
         $lesson->delete();
 
         return response()->json([
-            'message' => 'Lesson deleted successfully.',
+            'message' => 'La leçon a été supprimée avec succès.',
         ]);
     }
 
-    public function destroyFile(
-        Course $course,
-        CourseModule $module,
-        Lesson $lesson,
-        LessonFile $lessonFile
-    ): JsonResponse {
-        $this->ensureBelongsToModule($course, $module, $lesson);
-        abort_unless($lessonFile->lesson_id === $lesson->id, 404);
-
-        $this->deleteStoredLessonFile($lessonFile->file_path);
-        $lessonFile->delete();
-        $this->syncPrimaryLessonFilePath($lesson);
-
-        return response()->json([
-            'message' => 'Le fichier a ete supprime.',
-        ]);
-    }
-
-    private function ensureBelongsToModule(Course $course, CourseModule $module, Lesson $lesson): void
+    private function ensureProfessorAssignedToCourse(Request $request, Course $course, CourseModule $module, ?Lesson $lesson = null): void
     {
-        abort_unless($module->course_id === $course->id && $lesson->module_id === $module->id, 404);
+        $belongs = $module->course_id === $course->id
+            && $request->user()->courses()->whereKey($course->id)->exists()
+            && ($lesson === null || $lesson->module_id === $module->id);
+
+        abort_unless($belongs, 404);
     }
 
     private function nextPosition(CourseModule $module): int
     {
-        return (int) Lesson::query()
-            ->where('module_id', $module->id)
-            ->max('position');
+        return (int) Lesson::query()->where('module_id', $module->id)->max('position');
     }
 
     private function storeLessonFiles(Lesson $lesson, Request $request): void
@@ -250,12 +188,7 @@ class LessonController extends Controller
     {
         $extension = pathinfo($originalName, PATHINFO_EXTENSION);
         $baseName = pathinfo($originalName, PATHINFO_FILENAME);
-        $safeBaseName = Str::of($baseName)
-            ->ascii()
-            ->replaceMatches('/[^A-Za-z0-9._-]+/', '_')
-            ->trim('_')
-            ->value();
-
+        $safeBaseName = Str::of($baseName)->ascii()->replaceMatches('/[^A-Za-z0-9._-]+/', '_')->trim('_')->value();
         $safeBaseName = $safeBaseName !== '' ? $safeBaseName : 'fichier';
         $safeExtension = Str::lower($extension);
         $candidate = $safeExtension !== '' ? "{$safeBaseName}.{$safeExtension}" : $safeBaseName;
@@ -263,9 +196,7 @@ class LessonController extends Controller
 
         while (File::exists($targetDirectory . DIRECTORY_SEPARATOR . $candidate)) {
             $counter++;
-            $candidate = $safeExtension !== ''
-                ? "{$safeBaseName}-{$counter}.{$safeExtension}"
-                : "{$safeBaseName}-{$counter}";
+            $candidate = $safeExtension !== '' ? "{$safeBaseName}-{$counter}.{$safeExtension}" : "{$safeBaseName}-{$counter}";
         }
 
         return $candidate;
@@ -274,10 +205,7 @@ class LessonController extends Controller
     private function syncPrimaryLessonFilePath(Lesson $lesson): void
     {
         $lesson->loadMissing('files');
-
-        $primaryPath = $lesson->files
-            ->sortBy('position')
-            ->first()?->file_path;
+        $primaryPath = $lesson->files->sortBy('position')->first()?->file_path;
 
         if ($lesson->file_path !== $primaryPath) {
             $lesson->forceFill(['file_path' => $primaryPath])->save();
