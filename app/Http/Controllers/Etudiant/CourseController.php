@@ -33,6 +33,9 @@ class CourseController extends Controller
 
         return Inertia::render('Etudiant/Courses/Index', [
             'courses' => $courses,
+            'initialCourseId' => $courses->contains('id', $request->integer('course'))
+                ? $request->integer('course')
+                : $courses->first()['id'] ?? null,
             'stats' => [
                 'totalCourses' => $courses->count(),
                 'totalModules' => $courses->sum('modules_count'),

@@ -1335,10 +1335,15 @@ export default function Index({ courses, lessonTypes }) {
                                             </p>
                                         </div>
                                         {selectedModule && (
-                                            <PrimaryButton className={greenButtonClass} onClick={openCreateLessonModal} disabled={!lessonTypes.length}>
-                                                <PlusIcon className="mr-2 h-5 w-5" />
-                                                {'Ajouter une leçon'}
-                                            </PrimaryButton>
+                                            <div className="flex flex-wrap items-center gap-3">
+                                                <span className="rounded-full bg-slate-100 px-4 py-2 text-sm font-semibold text-slate-700">
+                                                    {selectedModule.lessons.length} leçon{selectedModule.lessons.length > 1 ? 's' : ''}
+                                                </span>
+                                                <PrimaryButton className={greenButtonClass} onClick={openCreateLessonModal} disabled={!lessonTypes.length}>
+                                                    <PlusIcon className="mr-2 h-5 w-5" />
+                                                    {'Ajouter une leçon'}
+                                                </PrimaryButton>
+                                            </div>
                                         )}
                                     </div>
 

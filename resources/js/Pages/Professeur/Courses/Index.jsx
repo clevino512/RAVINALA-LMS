@@ -679,7 +679,7 @@ export default function Dashboard({ courses, lessonTypes, studentCount }) {
                                             <h2 className="text-2xl font-bold text-slate-900">leçons du module</h2>
                                             <p className="mt-1 text-base font-medium text-slate-500">{selectedModule?.title || 'Sélectionnez un module'}</p>
                                         </div>
-                                        {selectedModule && <PrimaryButton className={greenButtonClass} onClick={() => openCreateLessonModal(selectedModule)} disabled={!lessonTypes.length}><PlusIcon className="mr-2 h-5 w-5" />Ajouter une leçon</PrimaryButton>}
+                                        {selectedModule && <div className="flex flex-wrap items-center gap-3"><span className="rounded-full bg-slate-100 px-4 py-2 text-sm font-semibold text-slate-700">{selectedModule.lessons.length} leçon{selectedModule.lessons.length > 1 ? 's' : ''}</span><PrimaryButton className={greenButtonClass} onClick={() => openCreateLessonModal(selectedModule)} disabled={!lessonTypes.length}><PlusIcon className="mr-2 h-5 w-5" />Ajouter une leçon</PrimaryButton></div>}
                                     </div>
 
                                     <div className="mt-7">

@@ -270,9 +270,10 @@ function LessonFiles({ files }) {
     );
 }
 
-export default function Index({ courses, stats }) {
-    const [selectedCourseId, setSelectedCourseId] = useState(courses[0]?.id ?? null);
-    const [selectedModuleId, setSelectedModuleId] = useState(courses[0]?.current_module_id ?? courses[0]?.modules?.[0]?.id ?? null);
+export default function Index({ courses, stats, initialCourseId }) {
+    const initialCourse = courses.find((course) => course.id === initialCourseId) ?? courses[0];
+    const [selectedCourseId, setSelectedCourseId] = useState(initialCourse?.id ?? null);
+    const [selectedModuleId, setSelectedModuleId] = useState(initialCourse?.current_module_id ?? initialCourse?.modules?.[0]?.id ?? null);
     const [markingLessonId, setMarkingLessonId] = useState(null);
 
     const selectedCourse = useMemo(
@@ -362,56 +363,7 @@ export default function Index({ courses, stats }) {
                     </div>
                 </section>
 
-                <section className="grid gap-6 xl:grid-cols-[340px_minmax(0,1fr)]">
-                    <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
-                        <h2 className="text-xl font-semibold text-slate-900">Cours</h2>
-                        <p className="mt-1 text-sm text-slate-500">Choisissez un cours pour reprendre votre progression.</p>
-
-                        {courses.length > 0 ? (
-                            <div className="mt-6 space-y-4">
-                                {courses.map((course) => {
-                                    const active = course.id === selectedCourseId;
-
-                                    return (
-                                        <button
-                                            key={course.id}
-                                            type="button"
-                                            onClick={() => {
-                                                setSelectedCourseId(course.id);
-                                                setSelectedModuleId(course.current_module_id ?? course.modules?.find((module) => module.is_accessible)?.id ?? course.modules?.[0]?.id ?? null);
-                                            }}
-                                            className={`w-full rounded-3xl border p-5 text-left transition ${active ? 'border-emerald-300 bg-emerald-50 shadow-sm' : 'border-slate-200 bg-white hover:border-emerald-200'}`}
-                                        >
-                                            <div className="flex items-start justify-between gap-3">
-                                                <div>
-                                                    <h3 className="text-lg font-semibold text-slate-900">{course.name}</h3>
-                                                    <p className="mt-2 text-sm text-slate-500">{course.description || 'Aucune description disponible.'}</p>
-                                                </div>
-                                                {course.is_completed ? (
-                                                    <span className="rounded-full bg-emerald-100 px-3 py-1 text-xs font-semibold text-emerald-700">Terminé</span>
-                                                ) : (
-                                                    <span className="rounded-full bg-amber-100 px-3 py-1 text-xs font-semibold text-amber-700">À poursuivre</span>
-                                                )}
-                                            </div>
-                                            <div className="mt-4 h-2 overflow-hidden rounded-full bg-slate-200">
-                                                <div className="h-full rounded-full bg-emerald-600" style={{ width: `${course.progress_percentage}%` }} />
-                                            </div>
-                                            <div className="mt-3 flex flex-wrap gap-2 text-xs font-medium text-slate-500">
-                                                <span className="rounded-full bg-slate-100 px-3 py-1">{course.modules_count} modules</span>
-                                                <span className="rounded-full bg-slate-100 px-3 py-1">{course.lessons_count} leçons</span>
-                                                <span className="rounded-full bg-slate-100 px-3 py-1">{course.progress_percentage}% terminé</span>
-                                            </div>
-                                        </button>
-                                    );
-                                })}
-                            </div>
-                        ) : (
-                            <div className="mt-6 rounded-2xl border border-dashed border-slate-200 px-5 py-12 text-center text-sm text-slate-500">
-                                Aucun cours ne vous est encore attribué.
-                            </div>
-                        )}
-                    </div>
-
+                <section>
                     <div className="space-y-6">
                         {selectedCourse ? (
                             <>
@@ -482,11 +434,18 @@ export default function Index({ courses, stats }) {
                                             <h2 className="text-2xl font-bold text-slate-900">Leçons du module</h2>
                                             <p className="mt-1 text-base font-medium text-slate-500">{selectedModule?.title || 'Sélectionnez un module accessible'}</p>
                                         </div>
-                                        {selectedModule?.is_completed && (
-                                            <span className="inline-flex items-center rounded-full bg-emerald-100 px-4 py-2 text-sm font-semibold text-emerald-700">
-                                                <CheckCircleIcon className="mr-2 h-5 w-5" />
-                                                Module terminé
-                                            </span>
+                                        {selectedModule && (
+                                            <div className="flex flex-wrap items-center gap-3">
+                                                <span className="rounded-full bg-slate-100 px-4 py-2 text-sm font-semibold text-slate-700">
+                                                    {selectedModule.lessons.length} leçon{selectedModule.lessons.length > 1 ? 's' : ''}
+                                                </span>
+                                                {selectedModule.is_completed && (
+                                                    <span className="inline-flex items-center rounded-full bg-emerald-100 px-4 py-2 text-sm font-semibold text-emerald-700">
+                                                        <CheckCircleIcon className="mr-2 h-5 w-5" />
+                                                        Module terminé
+                                                    </span>
+                                                )}
+                                            </div>
                                         )}
                                     </div>
 
