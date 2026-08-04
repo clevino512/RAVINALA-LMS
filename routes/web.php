@@ -12,18 +12,9 @@ use App\Http\Controllers\Professeur\DashboardController as ProfesseurDashboardCo
 use App\Http\Controllers\Professeur\LessonController as ProfesseurLessonController;
 use App\Http\Controllers\Professeur\ModuleController as ProfesseurModuleController;
 use App\Http\Controllers\ProfileController;
-use Illuminate\Foundation\Application;
 use Illuminate\Support\Facades\Route;
-use Inertia\Inertia;
 
-Route::get('/', function () {
-    return Inertia::render('Welcome', [
-        'canLogin' => Route::has('login'),
-        'canRegister' => false,
-        'laravelVersion' => Application::VERSION,
-        'phpVersion' => PHP_VERSION,
-    ]);
-});
+Route::redirect('/', '/login');
 
 Route::get('/dashboard', function () {
     return redirect()->route(request()->user()->dashboardRouteName());
