@@ -1075,7 +1075,7 @@ export default function Index({ courses, lessonTypes }) {
                             {lessonForm.deleted_file_ids.length > 0 && (
                                 <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-xs text-amber-800">
                                     <p className="font-semibold">
-                                        {lessonForm.deleted_file_ids.length} fichier(s) seront supprimÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â©s avec ? Mettre ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â  jour ?.
+                                        {lessonForm.deleted_file_ids.length} fichier(s) seront supprimées avec ? Mettre à jour ?.
                                     </p>
                                     <div className="mt-2 space-y-1">
                                         {deletedEditingFiles.map((file) => (
@@ -1268,7 +1268,7 @@ export default function Index({ courses, lessonTypes }) {
                                     <div className="grid gap-4 p-4 lg:grid-cols-2">
                                         {selectedCourse.modules.length === 0 ? (
                                             <div className="rounded-2xl border border-dashed border-dark-200 px-5 py-10 text-center text-sm text-dark-500 lg:col-span-2">
-                                                {'Aucun module nÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢a encore ÃƒÆ’Ã‚Â©tÃƒÆ’Ã‚Â© crÃƒÆ’Ã‚Â©ÃƒÆ’Ã‚Â© pour ce cours.'}
+                                                {'Aucun module n\'a encore été créé pour ce cours.'}
                                             </div>
                                         ) : selectedCourse.modules.map((module) => {
                                             const isActive = module.id === selectedModuleId;
@@ -1354,7 +1354,7 @@ export default function Index({ courses, lessonTypes }) {
                                             </div>
                                         ) : selectedModule.lessons.length === 0 ? (
                                             <div className="rounded-2xl border border-dashed border-dark-200 px-5 py-10 text-center text-sm text-dark-500">
-                                                {'Aucune leçon nÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢a encore ÃƒÆ’Ã‚Â©tÃƒÆ’Ã‚Â© ajoutÃƒÆ’Ã‚Â©e ÃƒÆ’Ã‚Â  ce module.'}
+                                                {'Aucune leçon n\'a encore été ajoutée à ce module.'}
                                             </div>
                                         ) : (
                                             <div className="space-y-5">
@@ -1439,7 +1439,7 @@ export default function Index({ courses, lessonTypes }) {
                             </>
                         ) : (
                             <div className="rounded-3xl border border-dashed border-dark-200 bg-white px-6 py-16 text-center text-dark-500 shadow-sm">
-                                {'CrÃƒÆ’Ã‚Â©ez un premier cours pour commencer la structuration du contenu pÃƒÆ’Ã‚Â©dagogique.'}
+                                {'Créez un premier cours pour commencer la structuration du contenu pédagogique.'}
                             </div>
                         )}
                     </div>
