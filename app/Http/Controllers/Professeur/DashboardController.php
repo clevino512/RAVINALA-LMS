@@ -52,30 +52,35 @@ class DashboardController extends Controller
             ->map(function ($course) use ($lessonTotals, $completedLessonTotals) {
                 $totalLessons = (int) ($lessonTotals[$course->id] ?? 0);
 
+                $students = $course->users->map(function ($student) use ($course, $totalLessons, $completedLessonTotals): array {
+                    $completedLessons = (int) ($completedLessonTotals[$course->id . ':' . $student->id]->total ?? 0);
+                    $progressPercentage = $totalLessons === 0
+                        ? 0
+                        : round(($completedLessons / $totalLessons) * 100, 2);
+
+                    return [
+                        'id' => $student->id,
+                        'name' => $student->name,
+                        'first_name' => $student->first_name,
+                        'email' => $student->email,
+                        'status' => $student->status ? ['name' => $student->status->name] : null,
+                        'completed_lessons_count' => $completedLessons,
+                        'lessons_count' => $totalLessons,
+                        'progress_percentage' => $progressPercentage,
+                        'is_completed' => $totalLessons > 0 && $completedLessons === $totalLessons,
+                    ];
+                })->values();
+
+                $averageProgress = round($students->avg('progress_percentage') ?? 0, 1);
+
                 return [
                     'id' => $course->id,
                     'name' => $course->name,
                     'description' => $course->description,
-                    'users_count' => $course->users->count(),
+                    'users_count' => $students->count(),
                     'lessons_count' => $totalLessons,
-                    'students' => $course->users->map(function ($student) use ($course, $totalLessons, $completedLessonTotals): array {
-                        $completedLessons = (int) ($completedLessonTotals[$course->id . ':' . $student->id]->total ?? 0);
-                        $progressPercentage = $totalLessons === 0
-                            ? 0
-                            : round(($completedLessons / $totalLessons) * 100, 2);
-
-                        return [
-                            'id' => $student->id,
-                            'name' => $student->name,
-                            'first_name' => $student->first_name,
-                            'email' => $student->email,
-                            'status' => $student->status ? ['name' => $student->status->name] : null,
-                            'completed_lessons_count' => $completedLessons,
-                            'lessons_count' => $totalLessons,
-                            'progress_percentage' => $progressPercentage,
-                            'is_completed' => $totalLessons > 0 && $completedLessons === $totalLessons,
-                        ];
-                    })->values(),
+                    'average_progress' => $averageProgress,
+                    'students' => $students,
                 ];
             })
             ->values();
@@ -87,6 +92,13 @@ class DashboardController extends Controller
                 'totalStudents' => $courses->flatMap(fn ($course) => $course['students'])->unique('id')->count(),
                 'totalModules' => CourseModule::query()->whereIn('course_id', $courses->pluck('id'))->count(),
                 'totalLessons' => Lesson::query()->whereIn('module_id', CourseModule::query()->whereIn('course_id', $courses->pluck('id'))->select('id'))->count(),
+                'averageProgress' => round($courses->flatMap(fn ($course) => $course['students'])->avg('progress_percentage') ?? 0, 1),
+            ],
+            'charts' => [
+                'courseProgressOverview' => $courses->map(fn ($course) => [
+                    'label' => $course['name'],
+                    'value' => $course['average_progress'],
+                ])->all(),
             ],
         ]);
     }
