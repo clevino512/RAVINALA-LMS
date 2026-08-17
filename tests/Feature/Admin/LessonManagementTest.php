@@ -12,17 +12,22 @@ use App\Models\User;
 use App\Models\UserType;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
-use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Facades\File;
 use Tests\TestCase;
 
 class LessonManagementTest extends TestCase
 {
     use RefreshDatabase;
 
+    protected function tearDown(): void
+    {
+        File::deleteDirectory(public_path('lessons/data'));
+
+        parent::tearDown();
+    }
+
     public function test_an_administrator_can_create_a_lesson_with_multiple_files(): void
     {
-        Storage::fake('public');
-
         $status = Status::factory()->create(['name' => 'actif']);
         $adminType = UserType::factory()->create(['name' => 'admin']);
         $admin = User::factory()->create([
@@ -37,12 +42,12 @@ class LessonManagementTest extends TestCase
             'title' => 'Module de test',
             'position' => 1,
         ]);
-        $lessonType = LessonType::create(['name' => 'Multimédia']);
+        $lessonType = LessonType::create(['name' => 'Multimedia']);
 
         $response = $this->actingAs($admin)->post(
             route('admin.lms.courses.modules.lessons.store', [$course, $module]),
             [
-                'title' => 'Leçon multimédia',
+                'title' => 'Lecon multimedia',
                 'description' => 'Plusieurs supports.',
                 'duration' => 15,
                 'position' => 1,
@@ -57,17 +62,20 @@ class LessonManagementTest extends TestCase
 
         $response->assertCreated()->assertJsonCount(2, 'data.files');
 
-        $lesson = Lesson::query()->where('title', 'Leçon multimédia')->firstOrFail();
+        $lesson = Lesson::query()->where('title', 'Lecon multimedia')->with('files')->firstOrFail();
         $this->assertCount(2, $lesson->files);
+        $this->assertSame('/lessons/data/cours.pdf', $lesson->file_path);
+        $this->assertFileExists(public_path(ltrim($lesson->file_path, '/')));
+        $this->assertSame($lesson->files->sortBy('position')->first()->file_path, $lesson->file_path);
+        $this->assertSame('/lessons/data/cours.pdf', $lesson->files[0]->file_path);
+        $this->assertSame('/lessons/data/video.mp4', $lesson->files[1]->file_path);
         $lesson->files->each(
-            fn ($file) => Storage::disk('public')->assertExists($file->file_path)
+            fn ($file) => $this->assertFileExists(public_path(ltrim($file->file_path, '/')))
         );
     }
 
     public function test_an_administrator_can_add_and_delete_an_individual_lesson_file(): void
     {
-        Storage::fake('public');
-
         $status = Status::factory()->create(['name' => 'actif']);
         $adminType = UserType::factory()->create(['name' => 'admin']);
         $admin = User::factory()->create([
@@ -82,11 +90,11 @@ class LessonManagementTest extends TestCase
             'title' => 'Module de test',
             'position' => 1,
         ]);
-        $lessonType = LessonType::create(['name' => 'Multimédia']);
+        $lessonType = LessonType::create(['name' => 'Multimedia']);
         $lesson = Lesson::create([
             'module_id' => $module->id,
             'lesson_type_id' => $lessonType->id,
-            'title' => 'Leçon à modifier',
+            'title' => 'Lecon a modifier',
             'position' => 1,
             'is_published' => false,
         ]);
@@ -107,8 +115,11 @@ class LessonManagementTest extends TestCase
             ]
         )->assertOk()->assertJsonCount(1, 'data.files');
 
+        $lesson->refresh();
         $lessonFile = LessonFile::query()->where('lesson_id', $lesson->id)->firstOrFail();
-        Storage::disk('public')->assertExists($lessonFile->file_path);
+        $this->assertSame('/lessons/data/support.pdf', $lessonFile->file_path);
+        $this->assertFileExists(public_path(ltrim($lessonFile->file_path, '/')));
+        $this->assertSame($lessonFile->file_path, $lesson->file_path);
 
         $this->actingAs($admin)->put(
             route('admin.lms.courses.modules.lessons.update', [$course, $module, $lesson]),
@@ -123,7 +134,9 @@ class LessonManagementTest extends TestCase
             ]
         )->assertOk()->assertJsonCount(0, 'data.files');
 
+        $lesson->refresh();
+        $this->assertNull($lesson->file_path);
         $this->assertDatabaseMissing('lesson_files', ['id' => $lessonFile->id]);
-        Storage::disk('public')->assertMissing($lessonFile->file_path);
+        $this->assertFileDoesNotExist(public_path('lessons/data/support.pdf'));
     }
 }
