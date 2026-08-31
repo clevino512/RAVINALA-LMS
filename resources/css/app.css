@@ -10,39 +10,39 @@
 
 @layer components {
     .btn-primary {
-        @apply inline-flex items-center justify-center rounded-lg bg-primary-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition-all duration-200 hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50;
+        @apply inline-flex items-center justify-center rounded-xl bg-gradient-to-r from-accent-700 to-accent-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition-all duration-200 hover:from-accent-800 hover:to-accent-700 focus:outline-none focus:ring-2 focus:ring-accent-500 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50;
     }
 
     .btn-secondary {
-        @apply inline-flex items-center justify-center rounded-lg border border-dark-300 bg-white px-4 py-2.5 text-sm font-semibold text-dark-700 shadow-sm transition-all duration-200 hover:bg-dark-50 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50;
+        @apply inline-flex items-center justify-center rounded-xl border border-dark-300 bg-white px-4 py-2.5 text-sm font-semibold text-dark-700 shadow-sm transition-all duration-200 hover:bg-dark-50 focus:outline-none focus:ring-2 focus:ring-accent-500 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50;
     }
 
     .btn-danger {
-        @apply inline-flex items-center justify-center rounded-lg bg-red-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition-all duration-200 hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50;
+        @apply inline-flex items-center justify-center rounded-xl bg-red-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition-all duration-200 hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50;
     }
 
     .btn-success {
-        @apply inline-flex items-center justify-center rounded-lg bg-accent-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition-all duration-200 hover:bg-accent-700 focus:outline-none focus:ring-2 focus:ring-accent-500 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50;
+        @apply inline-flex items-center justify-center rounded-xl bg-accent-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition-all duration-200 hover:bg-accent-700 focus:outline-none focus:ring-2 focus:ring-accent-500 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50;
     }
 
     .btn-icon {
-        @apply inline-flex items-center justify-center rounded-lg p-2 text-dark-500 transition-all duration-200 hover:bg-dark-100 hover:text-dark-700 focus:outline-none focus:ring-2 focus:ring-primary-500;
+        @apply inline-flex items-center justify-center rounded-lg p-2 text-dark-500 transition-all duration-200 hover:bg-dark-100 hover:text-dark-700 focus:outline-none focus:ring-2 focus:ring-accent-500;
     }
 
     .input-field {
-        @apply block w-full rounded-lg border-dark-300 bg-white px-3 py-2.5 text-dark-900 shadow-sm transition-colors duration-200 placeholder:text-dark-400 focus:border-primary-500 focus:ring-primary-500 sm:text-sm;
+        @apply block w-full rounded-xl border-dark-300 bg-white px-3 py-2.5 text-dark-900 shadow-sm transition-colors duration-200 placeholder:text-dark-400 focus:border-accent-500 focus:ring-accent-500 sm:text-sm;
     }
 
     .input-select {
-        @apply block w-full rounded-lg border-dark-300 bg-white px-3 py-2.5 text-dark-900 shadow-sm transition-colors duration-200 focus:border-primary-500 focus:ring-primary-500 sm:text-sm;
+        @apply block w-full rounded-xl border-dark-300 bg-white px-3 py-2.5 text-dark-900 shadow-sm transition-colors duration-200 focus:border-accent-500 focus:ring-accent-500 sm:text-sm;
     }
 
     .input-textarea {
-        @apply block w-full rounded-lg border-dark-300 bg-white px-3 py-2.5 text-dark-900 shadow-sm transition-colors duration-200 placeholder:text-dark-400 focus:border-primary-500 focus:ring-primary-500 sm:text-sm;
+        @apply block w-full rounded-xl border-dark-300 bg-white px-3 py-2.5 text-dark-900 shadow-sm transition-colors duration-200 placeholder:text-dark-400 focus:border-accent-500 focus:ring-accent-500 sm:text-sm;
     }
 
     .card {
-        @apply rounded-xl border border-dark-200 bg-white shadow-sm;
+        @apply rounded-2xl border border-dark-200 bg-white shadow-sm;
     }
 
     .card-header {
@@ -74,15 +74,7 @@
     }
 
     .table td {
-        @apply whitespace-nowrap px-6 py-4 text-sm text-dark-700;
-    }
-
-    .sidebar-link {
-        @apply flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-dark-300 transition-all duration-200 hover:bg-dark-800 hover:text-white;
-    }
-
-    .sidebar-link.active {
-        @apply bg-primary-600 text-white hover:bg-primary-700;
+        @apply px-6 py-4 text-sm text-dark-700;
     }
 
     .badge {

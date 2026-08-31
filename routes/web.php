@@ -1,28 +1,64 @@
 <?php
 
-
 use App\Http\Controllers\Admin\ClientController;
-use App\Http\Controllers\Admin\DashboardController;
+use App\Http\Controllers\Admin\DashboardController as AdminDashboardController;
 use App\Http\Controllers\Admin\ProductController;
+use App\Http\Controllers\Admin\UserController as AdminUserController;
+use App\Http\Controllers\Etudiant\CourseController as EtudiantCourseController;
+use App\Http\Controllers\Etudiant\DashboardController as EtudiantDashboardController;
+use App\Http\Controllers\LessonMediaController;
+use App\Http\Controllers\Professeur\CourseController as ProfesseurCourseController;
+use App\Http\Controllers\Professeur\DashboardController as ProfesseurDashboardController;
+use App\Http\Controllers\Professeur\LessonController as ProfesseurLessonController;
+use App\Http\Controllers\Professeur\ModuleController as ProfesseurModuleController;
 use App\Http\Controllers\ProfileController;
-use Illuminate\Foundation\Application;
 use Illuminate\Support\Facades\Route;
-use Inertia\Inertia;
 
-Route::get('/', function () {
-    return Inertia::render('Welcome', [
-        'canLogin' => Route::has('login'),
-        'canRegister' => false,
-        'laravelVersion' => Application::VERSION,
-        'phpVersion' => PHP_VERSION,
-    ]);
+Route::redirect('/', '/login');
+
+Route::get('/dashboard', function () {
+    return redirect()->route(request()->user()->dashboardRouteName());
+})->middleware(['auth', 'verified', 'password.changed'])->name('dashboard');
+
+Route::middleware(['auth', 'verified', 'password.changed'])->group(function () {
+    Route::get('/lesson-media', [LessonMediaController::class, 'show'])->name('lesson.media');
+
+    Route::get('/admin/dashboard', [AdminDashboardController::class, 'index'])
+        ->middleware('user.type:admin,administrateur')
+        ->name('admin.dashboard');
+
+    Route::resource('/admin/users', AdminUserController::class)
+        ->only(['index', 'show', 'store', 'update', 'destroy'])
+        ->middleware('user.type:admin,administrateur')
+        ->names('admin.users');
+
+    Route::middleware('user.type:admin,administrateur')->prefix('admin')->name('admin.')->group(function () {
+        Route::resource('products', ProductController::class);
+        Route::resource('clients', ClientController::class);
+    });
+
+    Route::middleware('user.type:etudiant,student,étudiant')->prefix('etudiant')->name('etudiant.')->group(function () {
+        Route::get('dashboard', [EtudiantDashboardController::class, 'index'])->name('dashboard');
+        Route::get('courses', [EtudiantCourseController::class, 'index'])->name('courses.index');
+        Route::patch('courses/{course}/modules/{module}/lessons/{lesson}/complete', [EtudiantCourseController::class, 'completeLesson'])
+            ->name('courses.modules.lessons.complete');
+    });
+
+    Route::middleware('user.type:professeur,teacher')->prefix('professeur')->name('professeur.')->group(function () {
+        Route::get('dashboard', [ProfesseurDashboardController::class, 'index'])->name('dashboard');
+        Route::get('courses', [ProfesseurCourseController::class, 'index'])->name('courses.index');
+        Route::match(['put', 'patch'], 'courses/{course}/modules/{module}', [ProfesseurModuleController::class, 'update'])
+            ->name('courses.modules.update');
+        Route::post('courses/{course}/modules/{module}/lessons', [ProfesseurLessonController::class, 'store'])
+            ->name('courses.modules.lessons.store');
+        Route::patch('courses/{course}/modules/{module}/lessons/{lesson}/publication', [ProfesseurLessonController::class, 'updatePublication'])
+            ->name('courses.modules.lessons.publication');
+        Route::match(['put', 'patch'], 'courses/{course}/modules/{module}/lessons/{lesson}', [ProfesseurLessonController::class, 'update'])
+            ->name('courses.modules.lessons.update');
+        Route::delete('courses/{course}/modules/{module}/lessons/{lesson}', [ProfesseurLessonController::class, 'destroy'])
+            ->name('courses.modules.lessons.destroy');
+    });
 });
-
-
-
-Route::get('/dashboard', [DashboardController::class, 'index'])
-    ->middleware(['auth', 'verified', 'role:admin'])
-    ->name('dashboard');
 
 Route::middleware('auth')->group(function () {
     Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
@@ -30,24 +66,5 @@ Route::middleware('auth')->group(function () {
     Route::delete('/profile', [ProfileController::class, 'destroy'])->name('profile.destroy');
 });
 
-Route::middleware(['auth', 'verified', 'role:admin'])->prefix('admin')->name('admin.')->group(function () {
-    Route::get('/products', [ProductController::class, 'index'])->name('products.index');
-    Route::get('/products/create', [ProductController::class, 'create'])->name('products.create');
-    Route::post('/products', [ProductController::class, 'store'])->name('products.store');
-    Route::get('/products/{product}', [ProductController::class, 'show'])->name('products.show');
-    Route::get('/products/{product}/edit', [ProductController::class, 'edit'])->name('products.edit');
-    Route::put('/products/{product}', [ProductController::class, 'update'])->name('products.update');
-    Route::patch('/products/{product}', [ProductController::class, 'update']);
-    Route::delete('/products/{product}', [ProductController::class, 'destroy'])->name('products.destroy');
-
-    Route::get('/clients', [ClientController::class, 'index'])->name('clients.index');
-    Route::get('/clients/create', [ClientController::class, 'create'])->name('clients.create');
-    Route::post('/clients', [ClientController::class, 'store'])->name('clients.store');
-    Route::get('/clients/{client}', [ClientController::class, 'show'])->name('clients.show');
-    Route::get('/clients/{client}/edit', [ClientController::class, 'edit'])->name('clients.edit');
-    Route::put('/clients/{client}', [ClientController::class, 'update'])->name('clients.update');
-    Route::patch('/clients/{client}', [ClientController::class, 'update']);
-    Route::delete('/clients/{client}', [ClientController::class, 'destroy'])->name('clients.destroy');
-});
-
 require __DIR__.'/auth.php';
+require __DIR__.'/lms.php';

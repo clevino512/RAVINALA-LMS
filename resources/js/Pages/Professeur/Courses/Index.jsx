@@ -1,0 +1,872 @@
+import ConfirmModal from '@/Components/ConfirmModal';
+import FormInput from '@/Components/FormInput';
+import FormSelect from '@/Components/FormSelect';
+import FormTextarea from '@/Components/FormTextarea';
+import Modal from '@/Components/Modal';
+import PrimaryButton from '@/Components/PrimaryButton';
+import SecondaryButton from '@/Components/SecondaryButton';
+import AppLayout from '@/Layouts/AppLayout';
+import { Head, router } from '@inertiajs/react';
+import axios from 'axios';
+import {
+    ArrowDownTrayIcon,
+    BookOpenIcon,
+    ChevronLeftIcon,
+    ChevronRightIcon,
+    ClockIcon,
+    DocumentTextIcon,
+    EllipsisHorizontalIcon,
+    PauseIcon,
+    PencilSquareIcon,
+    PlayIcon,
+    PlusIcon,
+    SpeakerWaveIcon,
+    Squares2X2Icon,
+    TrashIcon,
+    UsersIcon,
+} from '@heroicons/react/24/outline';
+import { useEffect, useMemo, useRef, useState } from 'react';
+
+const emptyModuleForm = { title: '', description: '', position: '' };
+const emptyLessonForm = {
+    title: '',
+    description: '',
+    lesson_files: [],
+    deleted_file_ids: [],
+    duration: '',
+    position: '',
+    is_published: false,
+    lesson_type_id: '',
+};
+
+const greenButtonClass = '!rounded-xl !border !border-emerald-700 !bg-gradient-to-r !from-[#2d8b46] !to-[#24763a] !px-5 !py-3 !text-sm !font-semibold !text-white !shadow-[0_14px_26px_rgba(45,139,70,0.22)] hover:!from-[#25753b] hover:!to-[#1f6331]';
+const maxLessonFileSize = 500 * 1024 * 1024;
+const PLAYBACK_RATE_STORAGE_KEY = 'ravinala-media-playback-rate';
+const PLAYBACK_RATES = [0.25, 0.5, 0.75, 1, 1.25, 1.5, 1.75, 2, 2.5, 3];
+
+const savedPlaybackRate = () => {
+    if (typeof window === 'undefined') return 1;
+
+    const rate = Number(window.localStorage.getItem(PLAYBACK_RATE_STORAGE_KEY));
+    return PLAYBACK_RATES.includes(rate) ? rate : 1;
+};
+
+const publicMediaUrl = (path) => {
+    if (!path) return null;
+    if (/^(https?:|blob:|data:)/i.test(path)) return path;
+
+    const normalizedPath = String(path).replace(/^\/+/, '');
+
+    if (normalizedPath.startsWith('lessons/data/') || normalizedPath.startsWith('storage/')) {
+        return `/${normalizedPath}`;
+    }
+
+    return `/${normalizedPath.replace(/^storage\//, 'storage/')}`;
+};
+
+const mediaKind = (source, mimeType = '') => {
+    if (mimeType.startsWith('image/')) return 'image';
+    if (mimeType.startsWith('video/')) return 'video';
+    if (mimeType.startsWith('audio/')) return 'audio';
+    if (mimeType === 'application/pdf') return 'pdf';
+
+    const cleanSource = String(source ?? '').split(/[?#]/)[0].toLowerCase();
+    if (/\.(jpg|jpeg|png|gif|webp|svg|bmp|avif)$/.test(cleanSource)) return 'image';
+    if (/\.(mp4|webm|ogg|mov|m4v|mkv|avi|wmv|3gp)$/.test(cleanSource)) return 'video';
+    if (/\.(mp3|wav|oga|aac|m4a|flac)$/.test(cleanSource)) return 'audio';
+    if (/\.pdf$/.test(cleanSource)) return 'pdf';
+
+    return 'file';
+};
+
+function formatMediaTime(value) {
+    if (!Number.isFinite(value) || value < 0) {
+        return '0:00';
+    }
+
+    const totalSeconds = Math.floor(value);
+    const minutes = Math.floor(totalSeconds / 60);
+    const seconds = totalSeconds % 60;
+
+    return `${minutes}:${String(seconds).padStart(2, '0')}`;
+}
+
+function MediaPlayer({ url, kind, frameClass }) {
+    const mediaRef = useRef(null);
+    const [isPlaying, setIsPlaying] = useState(false);
+    const [currentTime, setCurrentTime] = useState(0);
+    const [duration, setDuration] = useState(0);
+    const [playbackRate, setPlaybackRate] = useState(savedPlaybackRate);
+    const [volume, setVolume] = useState(1);
+
+    useEffect(() => {
+        const media = mediaRef.current;
+        if (!media) return undefined;
+
+        const syncState = () => {
+            setCurrentTime(media.currentTime || 0);
+            setDuration(media.duration || 0);
+            setIsPlaying(!media.paused && !media.ended);
+        };
+
+        media.playbackRate = playbackRate;
+
+        syncState();
+
+        media.addEventListener('loadedmetadata', syncState);
+        media.addEventListener('timeupdate', syncState);
+        media.addEventListener('play', syncState);
+        media.addEventListener('pause', syncState);
+        media.addEventListener('ended', syncState);
+
+        return () => {
+            media.removeEventListener('loadedmetadata', syncState);
+            media.removeEventListener('timeupdate', syncState);
+            media.removeEventListener('play', syncState);
+            media.removeEventListener('pause', syncState);
+            media.removeEventListener('ended', syncState);
+        };
+    }, [url, playbackRate]);
+
+    const togglePlayback = async () => {
+        const media = mediaRef.current;
+        if (!media) return;
+
+        if (media.paused) {
+            await media.play();
+        } else {
+            media.pause();
+        }
+    };
+
+    const handleSeek = (event) => {
+        const media = mediaRef.current;
+        if (!media) return;
+
+        const nextTime = Number(event.target.value);
+        media.currentTime = nextTime;
+        setCurrentTime(nextTime);
+    };
+
+    const handleVolumeChange = (event) => {
+        const media = mediaRef.current;
+        const nextVolume = Number(event.target.value);
+        setVolume(nextVolume);
+
+        if (media) {
+            media.volume = nextVolume;
+        }
+    };
+
+    const changePlaybackRate = (event) => {
+        const media = mediaRef.current;
+        const nextRate = Number(event.target.value);
+        setPlaybackRate(nextRate);
+
+        if (media) {
+            media.playbackRate = nextRate;
+        }
+
+        window.localStorage.setItem(PLAYBACK_RATE_STORAGE_KEY, String(nextRate));
+    };
+
+    return (
+        <div className={`${frameClass} ${kind === 'video' ? 'bg-black' : 'p-4'}`}>
+            {kind === 'video' ? (
+                <video ref={mediaRef} src={url} preload="metadata" controls className="aspect-video w-full bg-black object-contain" />
+            ) : (
+                <audio ref={mediaRef} src={url} preload="metadata" controls className="w-full" />
+            )}
+            <div className={`space-y-3 ${kind === 'video' ? 'border-t border-white/10 bg-slate-950 p-4 text-white' : ''}`}>
+                <div className="flex flex-wrap items-center gap-3">
+                    <button
+                        type="button"
+                        onClick={() => {
+                            void togglePlayback();
+                        }}
+                        className={`inline-flex h-11 w-11 items-center justify-center rounded-full ${kind === 'video' ? 'bg-white/10 text-white hover:bg-white/20' : 'bg-slate-900 text-white hover:bg-slate-700'}`}
+                        aria-label={isPlaying ? 'Mettre en pause' : 'Lire le média'}
+                    >
+                        {isPlaying ? <PauseIcon className="h-5 w-5" /> : <PlayIcon className="h-5 w-5" />}
+                    </button>
+                    <span className={`w-24 text-sm font-medium tabular-nums ${kind === 'video' ? 'text-white' : 'text-slate-700'}`}>
+                        {formatMediaTime(currentTime)} / {formatMediaTime(duration)}
+                    </span>
+                    <input
+                        type="range"
+                        min="0"
+                        max={duration || 0}
+                        step="0.1"
+                        value={Math.min(currentTime, duration || 0)}
+                        onInput={handleSeek}
+                        onChange={handleSeek}
+                        className="h-2 min-w-[180px] flex-1 cursor-pointer accent-emerald-600"
+                        aria-label="Avancer ou reculer dans le média"
+                    />
+                    <div className="flex items-center gap-2">
+                        <SpeakerWaveIcon className={`h-5 w-5 ${kind === 'video' ? 'text-white' : 'text-slate-500'}`} />
+                        <input
+                            type="range"
+                            min="0"
+                            max="1"
+                            step="0.05"
+                            value={volume}
+                            onChange={handleVolumeChange}
+                            className="h-2 w-20 cursor-pointer accent-emerald-600"
+                            aria-label="Volume"
+                        />
+                    </div>
+                    <label className="flex items-center gap-2 text-sm font-medium">
+                        <span>Vitesse</span>
+                        <select
+                            value={playbackRate}
+                            onChange={changePlaybackRate}
+                            className={`rounded-lg border px-2 py-1 text-sm ${kind === 'video' ? 'border-white/20 bg-slate-800 text-white' : 'border-slate-200 bg-white text-slate-700'}`}
+                            aria-label="Vitesse de lecture"
+                        >
+                            {PLAYBACK_RATES.map((rate) => <option key={rate} value={rate}>{rate}×</option>)}
+                        </select>
+                    </label>
+                </div>
+            </div>
+        </div>
+    );
+}
+
+function VideoPreview({ url, frameClass }) {
+    return <MediaPlayer url={url} kind="video" frameClass={frameClass} />;
+}
+
+function MediaPreview({ source, mimeType = '', className = '' }) {
+    const url = publicMediaUrl(source);
+    if (!url) return null;
+
+    const kind = mediaKind(source, mimeType);
+    const frameClass = `overflow-hidden rounded-2xl border border-slate-200 bg-slate-50 ${className}`;
+
+    if (kind === 'image') return <div className={frameClass}><img src={url} alt="Aperçu de la leçon" className="h-64 w-full object-contain" /></div>;
+    if (kind === 'video') return <VideoPreview url={url} frameClass={frameClass} />;
+    if (kind === 'audio') return <MediaPlayer url={url} kind="audio" frameClass={frameClass} />;
+
+    if (kind === 'pdf') {
+        const fileName = decodeURIComponent(String(source).split('/').pop()?.split(/[?#]/)[0] || 'Document PDF');
+
+        return (
+            <div className={`${frameClass} flex min-h-40 items-center gap-5 p-6`}>
+                <div className="flex h-28 w-20 shrink-0 flex-col items-center justify-end rounded-xl border border-slate-200 bg-white p-3 shadow-sm">
+                    <DocumentTextIcon className="mb-2 h-9 w-9 text-slate-400" />
+                    <span className="rounded-md bg-red-500 px-2 py-1 text-xs font-bold text-white">PDF</span>
+                </div>
+                <div className="min-w-0">
+                    <p className="truncate font-semibold text-slate-800">{fileName}</p>
+                    <a href={url} download={fileName} className="mt-4 inline-flex items-center rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 shadow-sm hover:bg-slate-50">
+                        <ArrowDownTrayIcon className="mr-2 h-5 w-5" />
+                        Télécharger le PDF
+                    </a>
+                </div>
+            </div>
+        );
+    }
+
+    return <a href={url} target="_blank" rel="noreferrer" className={`${frameClass} block px-4 py-5 text-sm font-semibold text-emerald-700 hover:bg-emerald-50`}>Ouvrir le fichier</a>;
+}
+function LessonFilesCarousel({ files }) {
+    const carouselRef = useRef(null);
+    const [activeIndex, setActiveIndex] = useState(0);
+
+    useEffect(() => {
+        setActiveIndex((current) => Math.min(current, Math.max(files.length - 1, 0)));
+    }, [files.length]);
+
+    const scrollToFile = (nextIndex) => {
+        const safeIndex = Math.max(0, Math.min(nextIndex, files.length - 1));
+        const container = carouselRef.current;
+        if (!container) return;
+
+        container.scrollTo({ left: safeIndex * container.clientWidth, behavior: 'smooth' });
+        setActiveIndex(safeIndex);
+    };
+
+    const handleScroll = () => {
+        const container = carouselRef.current;
+        if (!container?.clientWidth) return;
+        setActiveIndex(Math.round(container.scrollLeft / container.clientWidth));
+    };
+
+    if (!files?.length) {
+        return <div className="flex min-h-36 items-center justify-center rounded-2xl border border-dashed border-slate-200 bg-slate-50 text-sm text-slate-400">Aucun fichier</div>;
+    }
+
+    return (
+        <div className="relative">
+            <div className="mb-2 flex items-center justify-between gap-3">
+                <span className="text-xs font-semibold text-slate-500">Fichier {activeIndex + 1} sur {files.length}</span>
+                {files.length > 1 && (
+                    <div className="flex gap-2">
+                        <button type="button" onClick={() => scrollToFile(activeIndex - 1)} disabled={activeIndex === 0} className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-700 shadow-sm hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40" aria-label="Fichier prÃ©cÃ©dent"><ChevronLeftIcon className="h-5 w-5" /></button>
+                        <button type="button" onClick={() => scrollToFile(activeIndex + 1)} disabled={activeIndex === files.length - 1} className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-700 shadow-sm hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40" aria-label="Fichier suivant"><ChevronRightIcon className="h-5 w-5" /></button>
+                    </div>
+                )}
+            </div>
+            <div ref={carouselRef} onScroll={handleScroll} className="flex snap-x snap-mandatory overflow-x-auto scroll-smooth [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+                {files.map((lessonFile) => (
+                    <div key={lessonFile.id} className="w-full min-w-full snap-start">
+                        <p className="mb-1 truncate text-xs font-medium text-slate-500">{lessonFile.original_name}</p>
+                        <MediaPreview source={lessonFile.file_path} mimeType={lessonFile.mime_type ?? ''} className="w-full" />
+                    </div>
+                ))}
+            </div>
+        </div>
+    );
+}
+
+export default function Dashboard({ courses, lessonTypes, studentCount }) {
+    const [selectedCourseId, setSelectedCourseId] = useState(courses[0]?.id ?? null);
+    const [selectedModuleId, setSelectedModuleId] = useState(courses[0]?.modules?.[0]?.id ?? null);
+    const [moduleModalOpen, setModuleModalOpen] = useState(false);
+    const [lessonModalOpen, setLessonModalOpen] = useState(false);
+    const [confirmModalOpen, setConfirmModalOpen] = useState(false);
+    const [moduleForm, setModuleForm] = useState(emptyModuleForm);
+    const [lessonForm, setLessonForm] = useState(emptyLessonForm);
+    const [moduleErrors, setModuleErrors] = useState({});
+    const [lessonErrors, setLessonErrors] = useState({});
+    const [moduleAction, setModuleAction] = useState({ item: null });
+    const [lessonAction, setLessonAction] = useState({ mode: 'create', item: null, moduleId: null });
+    const [confirmState, setConfirmState] = useState({ title: '', message: '', onConfirm: null });
+    const [processing, setProcessing] = useState(false);
+    const [feedback, setFeedback] = useState(null);
+    const [lessonFilePreviews, setLessonFilePreviews] = useState([]);
+    const [lessonMenuId, setLessonMenuId] = useState(null);
+    const [publishingLessonId, setPublishingLessonId] = useState(null);
+
+    const selectedCourse = useMemo(() => courses.find((course) => course.id === selectedCourseId) ?? null, [courses, selectedCourseId]);
+    const selectedModule = useMemo(() => selectedCourse?.modules?.find((module) => module.id === selectedModuleId) ?? null, [selectedCourse, selectedModuleId]);
+    const editingLesson = useMemo(() => selectedCourse?.modules?.flatMap((module) => module.lessons ?? []).find((lesson) => lesson.id === lessonAction.item?.id) ?? lessonAction.item, [selectedCourse, lessonAction.item]);
+
+    const stats = useMemo(() => ({
+        totalCourses: courses.length,
+        totalModules: courses.reduce((sum, course) => sum + (course.modules_count ?? 0), 0),
+        totalLessons: courses.reduce((sum, course) => sum + (course.lessons_count ?? 0), 0),
+        totalStudents: studentCount,
+    }), [courses, studentCount]);
+
+    useEffect(() => {
+        if (!courses.length) {
+            setSelectedCourseId(null);
+            setSelectedModuleId(null);
+            return;
+        }
+
+        const hasCurrentCourse = courses.some((course) => course.id === selectedCourseId);
+        const nextCourseId = hasCurrentCourse ? selectedCourseId : courses[0].id;
+        setSelectedCourseId(nextCourseId);
+
+        const nextCourse = courses.find((course) => course.id === nextCourseId) ?? courses[0];
+        const hasCurrentModule = nextCourse.modules?.some((module) => module.id === selectedModuleId);
+        setSelectedModuleId(hasCurrentModule ? selectedModuleId : (nextCourse.modules?.[0]?.id ?? null));
+    }, [courses, selectedCourseId, selectedModuleId]);
+
+    useEffect(() => {
+        if (!feedback) return undefined;
+        const timeout = window.setTimeout(() => setFeedback(null), 5000);
+        return () => window.clearTimeout(timeout);
+    }, [feedback]);
+
+    useEffect(() => {
+        if (!lessonForm.lesson_files.length) {
+            setLessonFilePreviews([]);
+            return undefined;
+        }
+
+        const previews = lessonForm.lesson_files.map((file) => ({ file, url: URL.createObjectURL(file) }));
+        setLessonFilePreviews(previews);
+        return () => previews.forEach((preview) => URL.revokeObjectURL(preview.url));
+    }, [lessonForm.lesson_files]);
+
+    const reloadData = (callback) => {
+        router.reload({
+            only: ['courses', 'lessonTypes', 'studentCount'],
+            preserveScroll: true,
+            preserveState: true,
+            onSuccess: () => callback?.(),
+        });
+    };
+
+    const normalizeErrors = (error) => (error?.response?.status === 422 ? error.response.data.errors ?? {} : {});
+    const resolveErrorMessage = (error, fallback) => error?.response?.data?.message ?? fallback;
+
+    const closeModuleModal = () => {
+        setModuleModalOpen(false);
+        setModuleAction({ item: null });
+        setModuleForm(emptyModuleForm);
+        setModuleErrors({});
+    };
+
+    const closeLessonModal = () => {
+        setLessonModalOpen(false);
+        setLessonAction({ mode: 'create', item: null, moduleId: null });
+        setLessonForm(emptyLessonForm);
+        setLessonErrors({});
+    };
+
+    const openEditModuleModal = (module) => {
+        setModuleAction({ item: module });
+        setModuleForm({ title: module.title ?? '', description: module.description ?? '', position: String(module.position ?? '') });
+        setModuleErrors({});
+        setModuleModalOpen(true);
+    };
+
+    const openCreateLessonModal = (module = selectedModule) => {
+        if (!module) return;
+
+        const nextPosition = Math.max(0, ...(module.lessons ?? []).map((lesson) => Number(lesson.position) || 0)) + 1;
+        setSelectedModuleId(module.id);
+        setLessonAction({ mode: 'create', item: null, moduleId: module.id });
+        setLessonForm({ ...emptyLessonForm, position: String(nextPosition), lesson_type_id: lessonTypes[0]?.id ? String(lessonTypes[0].id) : '' });
+        setLessonErrors({});
+        setLessonModalOpen(true);
+    };
+
+    const openEditLessonModal = (lesson) => {
+        setLessonAction({ mode: 'edit', item: lesson, moduleId: selectedModule?.id ?? null });
+        setLessonForm({
+            title: lesson.title ?? '',
+            description: lesson.description ?? '',
+            lesson_files: [],
+            deleted_file_ids: [],
+            duration: lesson.duration ?? '',
+            position: String(lesson.position ?? ''),
+            is_published: Boolean(lesson.is_published),
+            lesson_type_id: lesson.lesson_type_id ? String(lesson.lesson_type_id) : '',
+        });
+        setLessonErrors({});
+        setLessonModalOpen(true);
+    };
+
+    const handleLessonFileChange = (event) => {
+        const input = event.target;
+        const newFiles = Array.from(input.files ?? []);
+        const oversizedFile = newFiles.find((file) => file.size > maxLessonFileSize);
+
+        if (oversizedFile) {
+            input.value = '';
+            setLessonErrors((current) => ({ ...current, lesson_files: [`Le fichier "${oversizedFile.name}" dÃ©passe la taille maximale de 500 Mo.`] }));
+            return;
+        }
+
+        const existingKeys = new Set(lessonForm.lesson_files.map((file) => `${file.name}-${file.size}-${file.lastModified}`));
+        const uniqueNewFiles = newFiles.filter((file) => !existingKeys.has(`${file.name}-${file.size}-${file.lastModified}`));
+        const combinedFiles = [...lessonForm.lesson_files, ...uniqueNewFiles];
+
+        if (combinedFiles.length > 4) {
+            setLessonErrors((errors) => ({ ...errors, lesson_files: ['Vous pouvez envoyer au maximum 4 fichiers Ã  la fois.'] }));
+            input.value = '';
+            return;
+        }
+
+        setLessonErrors((errors) => ({ ...errors, lesson_files: undefined }));
+        setLessonForm((current) => ({ ...current, lesson_files: combinedFiles }));
+        input.value = '';
+    };
+
+    const removePendingLessonFile = (fileToRemove) => {
+        setLessonForm((current) => ({ ...current, lesson_files: current.lesson_files.filter((file) => file !== fileToRemove) }));
+    };
+
+    const toggleExistingFileDeletion = (fileId) => {
+        setLessonForm((current) => ({
+            ...current,
+            deleted_file_ids: current.deleted_file_ids.includes(fileId)
+                ? current.deleted_file_ids.filter((id) => id !== fileId)
+                : [...current.deleted_file_ids, fileId],
+        }));
+    };
+
+    const submitModule = async (event) => {
+        event.preventDefault();
+        if (!selectedCourse || !moduleAction.item) return;
+
+        setProcessing(true);
+        setModuleErrors({});
+
+        try {
+            const response = await axios.put(route('professeur.courses.modules.update', [selectedCourse.id, moduleAction.item.id]), {
+                title: moduleForm.title,
+                description: moduleForm.description,
+                position: moduleForm.position,
+            });
+
+            reloadData(() => {
+                closeModuleModal();
+                setFeedback({ type: 'success', message: response.data.message });
+            });
+        } catch (error) {
+            setModuleErrors(normalizeErrors(error));
+            setFeedback({ type: 'error', message: resolveErrorMessage(error, 'La mise Ã  jour du module a Ã©chouÃ©.') });
+        } finally {
+            setProcessing(false);
+        }
+    };
+
+    const submitLesson = async (event) => {
+        event.preventDefault();
+        if (!selectedCourse || !lessonAction.moduleId) return;
+
+        setProcessing(true);
+        setLessonErrors({});
+
+        const payload = new FormData();
+        payload.append('title', lessonForm.title);
+        payload.append('description', lessonForm.description ?? '');
+        payload.append('duration', lessonForm.duration === '' ? '' : lessonForm.duration);
+        payload.append('position', lessonForm.position);
+        payload.append('is_published', lessonForm.is_published ? '1' : '0');
+        payload.append('lesson_type_id', lessonForm.lesson_type_id);
+        lessonForm.lesson_files.forEach((file) => payload.append('lesson_files[]', file));
+        lessonForm.deleted_file_ids.forEach((id) => payload.append('deleted_file_ids[]', id));
+
+        try {
+            const response = lessonAction.mode === 'edit'
+                ? await axios.post(route('professeur.courses.modules.lessons.update', [selectedCourse.id, lessonAction.moduleId, lessonAction.item.id]), (() => {
+                    payload.append('_method', 'put');
+                    return payload;
+                })(), { headers: { 'Content-Type': 'multipart/form-data' } })
+                : await axios.post(route('professeur.courses.modules.lessons.store', [selectedCourse.id, lessonAction.moduleId]), payload, { headers: { 'Content-Type': 'multipart/form-data' } });
+
+            reloadData(() => {
+                closeLessonModal();
+                setFeedback({ type: 'success', message: response.data.message });
+            });
+        } catch (error) {
+            setLessonErrors(normalizeErrors(error));
+            setFeedback({ type: 'error', message: resolveErrorMessage(error, 'Lâ€™enregistrement de la leçon a Ã©chouÃ©.') });
+        } finally {
+            setProcessing(false);
+        }
+    };
+
+    const toggleLessonPublication = async (lesson, isPublished) => {
+        if (!selectedCourse || !selectedModule) return;
+
+        setPublishingLessonId(lesson.id);
+
+        try {
+            const response = await axios.patch(route('professeur.courses.modules.lessons.publication', [selectedCourse.id, selectedModule.id, lesson.id]), { is_published: isPublished });
+            reloadData(() => setFeedback({ type: 'success', message: response.data.message }));
+        } catch (error) {
+            setFeedback({ type: 'error', message: resolveErrorMessage(error, 'La publication de la leçon a Ã©chouÃ©.') });
+        } finally {
+            setPublishingLessonId(null);
+        }
+    };
+
+    const askDeleteLesson = (lesson) => {
+        setConfirmState({
+            title: 'Supprimer cette leçon ?',
+            message: `La leçon "${lesson.title}" sera dÃ©finitivement supprimÃ©e avec ses fichiers.`,
+            onConfirm: async () => {
+                if (!selectedCourse || !selectedModule) return;
+                setProcessing(true);
+
+                try {
+                    const response = await axios.delete(route('professeur.courses.modules.lessons.destroy', [selectedCourse.id, selectedModule.id, lesson.id]));
+                    reloadData(() => {
+                        setConfirmModalOpen(false);
+                        setLessonMenuId(null);
+                        setFeedback({ type: 'success', message: response.data.message });
+                    });
+                } catch (error) {
+                    setFeedback({ type: 'error', message: resolveErrorMessage(error, 'La suppression de la leçon a Ã©chouÃ©.') });
+                } finally {
+                    setProcessing(false);
+                }
+            },
+        });
+        setConfirmModalOpen(true);
+    };
+
+    return (
+        <AppLayout
+            header={
+                <div>
+                    <h1 className="text-2xl font-bold text-slate-900">Mes cours attribuées</h1>
+                    <p className="mt-1 text-sm text-slate-500">Gérez les modules et les leçons des cours qui vous sont attribuées.</p>
+                </div>
+            }
+        >
+            <Head title="Espace professeur" />
+
+            <div className="space-y-6">
+                {feedback && <div className={`rounded-2xl border px-4 py-3 text-sm font-medium ${feedback.type === 'success' ? 'border-emerald-200 bg-emerald-50 text-emerald-700' : 'border-red-200 bg-red-50 text-red-700'}`}>{feedback.message}</div>}
+
+                <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+                    <div className="rounded-3xl border border-emerald-100 bg-white p-6 shadow-sm"><div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-emerald-100 text-emerald-700"><BookOpenIcon className="h-7 w-7" /></div><p className="mt-4 text-sm text-slate-500">Cours attribuées</p><p className="mt-1 text-4xl font-bold text-slate-900">{stats.totalCourses}</p></div>
+                    <div className="rounded-3xl border border-blue-100 bg-white p-6 shadow-sm"><div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-blue-100 text-blue-700"><Squares2X2Icon className="h-7 w-7" /></div><p className="mt-4 text-sm text-slate-500">Modules</p><p className="mt-1 text-4xl font-bold text-slate-900">{stats.totalModules}</p></div>
+                    <div className="rounded-3xl border border-amber-100 bg-white p-6 shadow-sm"><div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-amber-100 text-amber-700"><DocumentTextIcon className="h-7 w-7" /></div><p className="mt-4 text-sm text-slate-500">leçons</p><p className="mt-1 text-4xl font-bold text-slate-900">{stats.totalLessons}</p></div>
+                    <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm"><div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-slate-100 text-slate-700"><UsersIcon className="h-7 w-7" /></div><p className="mt-4 text-sm text-slate-500">Etudiants uniques</p><p className="mt-1 text-4xl font-bold text-slate-900">{stats.totalStudents}</p></div>
+                </section>
+
+                <section className="grid gap-6 xl:grid-cols-[340px_minmax(0,1fr)]">
+                    <aside className="rounded-3xl border border-slate-200 bg-white shadow-sm">
+                        <div className="border-b border-slate-100 px-6 py-5">
+                            <h2 className="text-xl font-semibold text-slate-900">Cours attribuées</h2>
+                            <p className="mt-1 text-sm text-slate-500">Choisissez un cours pour gérer sa structure.</p>
+                        </div>
+                        <div className="space-y-4 p-5">
+                            {courses.length === 0 ? <div className="rounded-2xl border border-dashed border-slate-200 px-4 py-10 text-center text-sm text-slate-500">Aucun cours ne vous est attribuÃ© pour le moment.</div> : courses.map((course) => {
+                                const isActive = course.id === selectedCourseId;
+                                return (
+                                    <button key={course.id} type="button" onClick={() => { setSelectedCourseId(course.id); setSelectedModuleId(course.modules?.[0]?.id ?? null); }} className={`w-full rounded-3xl border p-5 text-left transition ${isActive ? 'border-emerald-300 bg-emerald-50 shadow-sm' : 'border-slate-200 bg-white hover:border-emerald-200'}`}>
+                                        <h3 className="text-xl font-semibold text-slate-900">{course.name}</h3>
+                                        <p className="mt-2 text-sm text-slate-500">{course.description || 'Aucune description'}</p>
+                                        <div className="mt-4 flex flex-wrap gap-2 text-xs font-semibold text-slate-600">
+                                            <span className="rounded-full bg-slate-100 px-3 py-1">{course.modules_count} modules</span>
+                                            <span className="rounded-full bg-slate-100 px-3 py-1">{course.lessons_count} leçons</span>
+                                            <span className="rounded-full bg-slate-100 px-3 py-1">{course.users_count} apprenants</span>
+                                        </div>
+                                    </button>
+                                );
+                            })}
+                        </div>
+                    </aside>
+
+                    <div className="space-y-6">
+                        {selectedCourse ? (
+                            <>
+                                <section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
+                                    <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+                                        <div>
+                                            <h2 className="text-2xl font-bold text-slate-900">{selectedCourse.name}</h2>
+                                            <p className="mt-2 max-w-3xl text-sm text-slate-500">{selectedCourse.description || 'Aucune description pour ce cours.'}</p>
+                                        </div>
+                                        <div className="rounded-2xl bg-slate-50 px-4 py-3 text-sm text-slate-600">{selectedCourse.users_count} apprenant{selectedCourse.users_count > 1 ? 's' : ''} inscrit{selectedCourse.users_count > 1 ? 's' : ''}</div>
+                                    </div>
+                                </section>
+
+                                <section className="rounded-3xl border border-slate-200 bg-white shadow-sm">
+                                    <div className="border-b border-slate-100 px-6 py-5">
+                                        <h2 className="text-xl font-semibold text-slate-900">Modules du cours</h2>
+                                        <p className="mt-1 text-sm text-slate-500">Vous pouvez modifier un module et gérer librement ses leçons.</p>
+                                    </div>
+                                    <div className="grid gap-4 p-4 lg:grid-cols-2">
+                                        {selectedCourse.modules.length === 0 ? <div className="rounded-2xl border border-dashed border-slate-200 px-5 py-10 text-center text-sm text-slate-500 lg:col-span-2">Aucun module n'a encore été créé pour ce cours.</div> : selectedCourse.modules.map((module) => {
+                                            const isActive = module.id === selectedModuleId;
+                                            return (
+                                                <div key={module.id} className={`rounded-2xl border p-5 transition ${isActive ? 'border-blue-300 bg-blue-50' : 'border-slate-200 bg-white hover:border-blue-200'}`}>
+                                                    <button type="button" onClick={() => setSelectedModuleId(module.id)} className="w-full text-left">
+                                                        <div className="flex items-start justify-between gap-3">
+                                                            <div>
+                                                                <p className="text-xs font-semibold uppercase tracking-[0.16em] text-blue-600">Module {module.position}</p>
+                                                                <h3 className="mt-1 text-lg font-semibold text-slate-900">{module.title}</h3>
+                                                                <p className="mt-2 line-clamp-3 text-sm text-slate-500">{module.description || 'Aucune description'}</p>
+                                                            </div>
+                                                            <span className="rounded-full bg-white px-3 py-1 text-xs font-semibold text-slate-600 shadow-sm">{module.lessons.length} leçons</span>
+                                                        </div>
+                                                    </button>
+                                                    <div className="mt-4 flex flex-wrap gap-2">
+                                                        <SecondaryButton className="!rounded-xl" onClick={() => openEditModuleModal(module)}><PencilSquareIcon className="mr-2 h-4 w-4" />Modifier le module</SecondaryButton>
+                                                        <SecondaryButton className="!rounded-xl" onClick={() => openCreateLessonModal(module)} disabled={!lessonTypes.length}><PlusIcon className="mr-2 h-4 w-4" />Ajouter une leçon</SecondaryButton>
+                                                    </div>
+                                                </div>
+                                            );
+                                        })}
+                                    </div>
+                                </section>
+
+                                <section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
+                                    <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                                        <div>
+                                            <h2 className="text-2xl font-bold text-slate-900">leçons du module</h2>
+                                            <p className="mt-1 text-base font-medium text-slate-500">{selectedModule?.title || 'Sélectionnez un module'}</p>
+                                        </div>
+                                        {selectedModule && <div className="flex flex-wrap items-center gap-3"><span className="rounded-full bg-slate-100 px-4 py-2 text-sm font-semibold text-slate-700">{selectedModule.lessons.length} leçon{selectedModule.lessons.length > 1 ? 's' : ''}</span><PrimaryButton className={greenButtonClass} onClick={() => openCreateLessonModal(selectedModule)} disabled={!lessonTypes.length}><PlusIcon className="mr-2 h-5 w-5" />Ajouter une leçon</PrimaryButton></div>}
+                                    </div>
+
+                                    <div className="mt-7">
+                                        {!selectedModule ? <div className="rounded-2xl border border-dashed border-slate-200 px-5 py-10 text-center text-sm text-slate-500">Sélectionnez un module pour consulter ou gérer ses leçons.</div> : selectedModule.lessons.length === 0 ? <div className="rounded-2xl border border-dashed border-slate-200 px-5 py-10 text-center text-sm text-slate-500">Aucune leçon n’a encore été ajoutée à ce module.</div> : (
+                                            <div className="space-y-5">
+                                                {selectedModule.lessons.map((lesson) => (
+                                                    <article key={lesson.id} className="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm transition hover:shadow-md">
+                                                        <div className="grid xl:grid-cols-[minmax(280px,0.8fr)_minmax(0,1.4fr)]">
+                                                            <div className="flex min-w-0 flex-col border-b border-slate-200 p-6 xl:border-b-0 xl:border-r">
+                                                                <div>
+                                                                    <div className="flex items-start gap-4">
+                                                                        <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-amber-100 text-lg font-bold text-amber-700">{lesson.position}</div>
+                                                                        <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2">
+                                                                            <span className="rounded-full bg-amber-100 px-3 py-1 text-xs font-semibold text-amber-700">leçon {lesson.position}</span>
+                                                                            <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-600">{lesson.lesson_type?.name || 'Type non défini'}</span>
+                                                                            <span className={`rounded-full px-3 py-1 text-xs font-semibold ${lesson.is_published ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-600'}`}>{lesson.is_published ? 'Publiée' : 'Brouillon'}</span>
+                                                                        </div>
+                                                                    </div>
+                                                                    <h3 className="mt-5 text-xl font-semibold text-slate-900">{lesson.title}</h3>
+                                                                    <p className="mt-3 text-sm leading-7 text-slate-500">{lesson.description || 'Aucune description'}</p>
+                                                                    <div className="mt-5 flex items-center gap-2 text-sm font-medium text-slate-500"><ClockIcon className="h-5 w-5" /><span>{lesson.duration ? `${lesson.duration} min` : 'Durée non définie'}</span></div>
+                                                                </div>
+                                                                <div className="mt-8 space-y-4 xl:mt-auto xl:pt-8">
+                                                                    <label className="inline-flex cursor-pointer items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-semibold text-slate-700 shadow-sm">
+                                                                        <input type="checkbox" checked={Boolean(lesson.is_published)} disabled={publishingLessonId === lesson.id} onChange={(event) => toggleLessonPublication(lesson, event.target.checked)} className="rounded border-slate-300 text-emerald-600 focus:ring-emerald-500 disabled:opacity-50" />
+                                                                        {publishingLessonId === lesson.id ? 'Enregistrement...' : 'Rendre publique'}
+                                                                    </label>
+                                                                    <div className="relative flex flex-wrap items-center gap-3">
+                                                                        <SecondaryButton className="!rounded-xl !px-4 !py-3" onClick={() => openEditLessonModal(lesson)}><PencilSquareIcon className="mr-2 h-4 w-4" />Modifier</SecondaryButton>
+                                                                        <button type="button" onClick={() => setLessonMenuId((current) => (current === lesson.id ? null : lesson.id))} className="inline-flex h-11 w-11 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-600 shadow-sm transition hover:bg-slate-50" aria-label="Actions de la leçon"><EllipsisHorizontalIcon className="h-6 w-6" /></button>
+                                                                        {lessonMenuId === lesson.id && <button type="button" onClick={() => { setLessonMenuId(null); askDeleteLesson(lesson); }} className="absolute left-0 top-full z-10 mt-2 inline-flex items-center rounded-xl border border-red-100 bg-white px-4 py-3 text-sm font-semibold text-red-600 shadow-lg hover:bg-red-50"><TrashIcon className="mr-2 h-5 w-5" />Supprimer</button>}
+                                                                    </div>
+                                                                </div>
+                                                            </div>
+                                                            <div className="min-w-0 bg-slate-50 p-4 sm:p-6">
+                                                                <LessonFilesCarousel files={lesson.files ?? []} />
+                                                            </div>
+                                                        </div>
+                                                    </article>
+                                                ))}
+                                            </div>
+                                        )}
+                                    </div>
+                                </section>
+                            </>
+                        ) : <div className="rounded-3xl border border-dashed border-slate-200 bg-white px-6 py-16 text-center text-slate-500 shadow-sm">Aucun cours attribuÃ© Ã  afficher.</div>}
+                    </div>
+                </section>
+
+                <Modal show={moduleModalOpen} onClose={closeModuleModal} maxWidth="2xl">
+                    <form onSubmit={submitModule} className="p-6">
+                        <h2 className="text-xl font-semibold text-slate-900">Modifier le module</h2>
+                        <div className="mt-6 grid gap-4">
+                            <FormInput label="Titre du module" name="module_title" value={moduleForm.title} onChange={(event) => setModuleForm((current) => ({ ...current, title: event.target.value }))} error={moduleErrors.title?.[0]} required />
+                            <FormTextarea label="Description" name="module_description" value={moduleForm.description} onChange={(event) => setModuleForm((current) => ({ ...current, description: event.target.value }))} error={moduleErrors.description?.[0]} rows={4} />
+                            <FormInput label="Position" name="module_position" type="number" value={moduleForm.position} onChange={(event) => setModuleForm((current) => ({ ...current, position: event.target.value }))} error={moduleErrors.position?.[0]} required />
+                        </div>
+                        <div className="mt-6 flex justify-end gap-3">
+                            <SecondaryButton onClick={closeModuleModal} type="button" disabled={processing}>Annuler</SecondaryButton>
+                            <PrimaryButton type="submit" className={greenButtonClass} disabled={processing}>{processing ? 'Enregistrement...' : 'Mettre Ã  jour'}</PrimaryButton>
+                        </div>
+                    </form>
+                </Modal>
+
+                <Modal show={lessonModalOpen} onClose={closeLessonModal} maxWidth="6xl">
+                    <form onSubmit={submitLesson} className="flex max-h-[92vh] flex-col">
+                        <div className="shrink-0 border-b border-slate-200 px-6 py-5">
+                            <h2 className="text-2xl font-bold text-slate-900">
+                                {lessonAction.mode === 'edit' ? 'Modifier la le\u00e7on' : 'Ajouter une le\u00e7on'}
+                            </h2>
+                            <p className="mt-1 text-sm text-slate-500">
+                                {selectedModule ? `Module concern\u00e9 : ${selectedModule.title}` : 'S\u00e9lectionnez d\u2019abord un module.'}
+                            </p>
+                        </div>
+
+                        <div className="grid min-h-0 flex-1 overflow-y-auto lg:grid-cols-[minmax(0,0.85fr)_minmax(0,1.15fr)]">
+                            <div className="space-y-5 border-b border-slate-200 p-6 lg:border-b-0 lg:border-r">
+                                <div>
+                                    <h3 className="font-semibold text-slate-900">{'Informations de la le\u00e7on'}</h3>
+                                    <p className="mt-1 text-xs text-slate-500">{'Renseignez les informations p\u00e9dagogiques principales.'}</p>
+                                </div>
+                                <FormInput label={'Titre de la le\u00e7on'} name="lesson_title" value={lessonForm.title} onChange={(event) => setLessonForm((current) => ({ ...current, title: event.target.value }))} error={lessonErrors.title?.[0]} required />
+                                <div className="grid gap-4 sm:grid-cols-2">
+                                    <FormSelect label={'Type de le\u00e7on'} name="lesson_type_id" value={lessonForm.lesson_type_id} onChange={(event) => setLessonForm((current) => ({ ...current, lesson_type_id: event.target.value }))} error={lessonErrors.lesson_type_id?.[0]} required>
+                                        <option value="">{'S\u00e9lectionner'}</option>
+                                        {lessonTypes.map((type) => <option key={type.id} value={type.id}>{type.name}</option>)}
+                                    </FormSelect>
+                                    <FormInput label="Position" name="lesson_position" type="number" value={lessonForm.position} onChange={(event) => setLessonForm((current) => ({ ...current, position: event.target.value }))} error={lessonErrors.position?.[0]} required />
+                                </div>
+                                <FormInput label={'Dur\u00e9e (minutes)'} name="lesson_duration" type="number" value={lessonForm.duration} onChange={(event) => setLessonForm((current) => ({ ...current, duration: event.target.value }))} error={lessonErrors.duration?.[0]} />
+                                <FormTextarea label="Description" name="lesson_description" value={lessonForm.description} onChange={(event) => setLessonForm((current) => ({ ...current, description: event.target.value }))} error={lessonErrors.description?.[0]} rows={5} />
+                                <label className="flex items-center gap-3 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700">
+                                    <input type="checkbox" checked={lessonForm.is_published} onChange={(event) => setLessonForm((current) => ({ ...current, is_published: event.target.checked }))} className="rounded border-slate-300 text-emerald-600 focus:ring-emerald-500" />
+                                    {'Publier imm\u00e9diatement cette le\u00e7on'}
+                                </label>
+                            </div>
+
+                            <div className="min-w-0 space-y-5 bg-slate-50/60 p-6">
+                                <div>
+                                    <h3 className="font-semibold text-slate-900">{'Fichiers et m\u00e9dias'}</h3>
+                                    <p className="mt-1 text-xs text-slate-500">{'Ajoutez jusqu\'\u00e0 4 fichiers par envoi, 500 Mo maximum par fichier.'}</p>
+                                </div>
+                                <label className="flex cursor-pointer flex-col items-center justify-center rounded-2xl border-2 border-dashed border-emerald-200 bg-white px-6 py-8 text-center transition hover:border-emerald-400 hover:bg-emerald-50/40">
+                                    <PlusIcon className="h-8 w-8 text-emerald-600" />
+                                    <span className="mt-2 text-sm font-semibold text-emerald-700">{'Choisir des fichiers'}</span>
+                                    <span className="mt-1 text-xs text-slate-500">{'Images, vid\u00e9os, audios ou PDF'}</span>
+                                    <input type="file" multiple accept="image/*,video/*,audio/*,application/pdf" onChange={handleLessonFileChange} className="sr-only" />
+                                </label>
+                                {lessonErrors.lesson_files?.[0] && <p className="text-sm text-red-600">{lessonErrors.lesson_files[0]}</p>}
+
+                                {lessonAction.mode === 'edit' && lessonForm.deleted_file_ids.length > 0 && (
+                                    <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-xs text-amber-800">
+                                        <p className="font-semibold">
+                                            {`${lessonForm.deleted_file_ids.length} fichier(s) seront supprim\u00e9s lors de l\u2019enregistrement.`}
+                                        </p>
+                                        <div className="mt-2 space-y-1">
+                                            {editingLesson.files.filter((file) => lessonForm.deleted_file_ids.includes(file.id)).map((file) => (
+                                                <div key={file.id} className="flex items-center justify-between gap-3">
+                                                    <span className="truncate">{file.original_name}</span>
+                                                    <button type="button" onClick={() => toggleExistingFileDeletion(file.id)} className="shrink-0 font-semibold text-amber-900 underline">
+                                                        Restaurer
+                                                    </button>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
+                                )}
+
+                                <div className="max-h-[52vh] space-y-4 overflow-y-auto pr-2">
+                                    {lessonFilePreviews.length > 0 && (
+                                        <div className="space-y-3">
+                                            <p className="text-sm font-semibold text-emerald-700">
+                                                {`Nouveaux fichiers (${lessonFilePreviews.length})`}
+                                            </p>
+                                            {lessonFilePreviews.map((preview) => (
+                                                <div key={preview.url} className="rounded-2xl border border-emerald-100 bg-white p-3">
+                                                    <div className="mb-2 flex items-center justify-between gap-3">
+                                                        <p className="truncate text-xs font-medium text-slate-600">{preview.file.name}</p>
+                                                        <button type="button" onClick={() => removePendingLessonFile(preview.file)} className="inline-flex shrink-0 items-center text-xs font-semibold text-red-600 hover:text-red-700">
+                                                            <TrashIcon className="mr-1 h-4 w-4" /> Retirer
+                                                        </button>
+                                                    </div>
+                                                    <MediaPreview source={preview.url} mimeType={preview.file.type} />
+                                                </div>
+                                            ))}
+                                        </div>
+                                    )}
+
+                                    {lessonAction.mode === 'edit' && Boolean(editingLesson?.files?.length) && editingLesson.files.filter((file) => !lessonForm.deleted_file_ids.includes(file.id)).length > 0 && (
+                                        <div className="space-y-3">
+                                            <p className="text-sm font-semibold text-slate-700">
+                                                {`Fichiers enregistr\u00e9s (${editingLesson.files.filter((file) => !lessonForm.deleted_file_ids.includes(file.id)).length})`}
+                                            </p>
+                                            {editingLesson.files.filter((file) => !lessonForm.deleted_file_ids.includes(file.id)).map((file) => (
+                                                <div key={file.id} className="rounded-2xl border border-slate-200 bg-white p-3">
+                                                    <div className="mb-2 flex items-center justify-between gap-3">
+                                                        <p className="truncate text-xs font-medium text-slate-600">{file.original_name}</p>
+                                                        <button type="button" onClick={() => toggleExistingFileDeletion(file.id)} className="inline-flex shrink-0 items-center text-xs font-semibold text-red-600 hover:text-red-700">
+                                                            <TrashIcon className="mr-1 h-4 w-4" /> Supprimer
+                                                        </button>
+                                                    </div>
+                                                    <MediaPreview source={file.file_path} mimeType={file.mime_type ?? ''} />
+                                                </div>
+                                            ))}
+                                        </div>
+                                    )}
+
+                                    {!lessonFilePreviews.length && !(lessonAction.mode === 'edit' && editingLesson?.files?.filter((file) => !lessonForm.deleted_file_ids.includes(file.id)).length) && (
+                                        <div className="rounded-2xl border border-dashed border-slate-200 bg-white px-5 py-10 text-center text-sm text-slate-400">
+                                            {'Aucun fichier s\u00e9lectionn\u00e9.'}
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+                        </div>
+
+                        <div className="flex shrink-0 justify-end gap-3 border-t border-slate-200 bg-white px-6 py-4">
+                            <SecondaryButton onClick={closeLessonModal} type="button" disabled={processing}>Annuler</SecondaryButton>
+                            <PrimaryButton type="submit" className={greenButtonClass} disabled={processing || !lessonTypes.length}>
+                                {processing ? 'Enregistrement...' : lessonAction.mode === 'edit' ? 'Mettre \u00e0 jour la le\u00e7on' : 'Cr\u00e9er la le\u00e7on'}
+                            </PrimaryButton>
+                        </div>
+                    </form>
+                </Modal>
+
+                <ConfirmModal show={confirmModalOpen} onClose={() => setConfirmModalOpen(false)} onConfirm={confirmState.onConfirm} title={confirmState.title} message={confirmState.message} processing={processing} confirmText="Supprimer" />
+            </div>
+        </AppLayout>
+    );
+}

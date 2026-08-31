@@ -1,0 +1,98 @@
+<?php
+
+namespace App\Http\Controllers\Admin;
+
+use App\Http\Controllers\Controller;
+use App\Models\Course;
+use App\Models\CourseModule;
+use App\Models\LessonType;
+use Inertia\Inertia;
+use Inertia\Response;
+
+class CourseManagementController extends Controller
+{
+    public function index(): Response
+    {
+        $courses = Course::query()
+            ->with('users')
+            ->latest()
+            ->get()
+            ->map(function (Course $course) {
+                $modules = CourseModule::query()
+                    ->with(['lessons.lessonType', 'lessons.files'])
+                    ->where('course_id', $course->id)
+                    ->orderBy('position')
+                    ->get()
+                    ->map(function (CourseModule $module) {
+                        return [
+                            'id' => $module->id,
+                            'title' => $module->title,
+                            'description' => $module->description,
+                            'position' => $module->position,
+                            'created_at' => $module->created_at,
+                            'updated_at' => $module->updated_at,
+                            'lessons' => $module->lessons->map(function ($lesson) {
+                                $files = $lesson->files->map(fn ($file) => [
+                                    'id' => $file->id,
+                                    'file_path' => $file->file_path,
+                                    'original_name' => $file->original_name,
+                                    'mime_type' => $file->mime_type,
+                                    'file_size' => $file->file_size,
+                                    'position' => $file->position,
+                                ]);
+
+                                if ($files->isEmpty() && filled($lesson->file_path)) {
+                                    $files = collect([[
+                                        'id' => 'legacy-' . $lesson->id,
+                                        'file_path' => $lesson->file_path,
+                                        'original_name' => basename($lesson->file_path),
+                                        'mime_type' => null,
+                                        'file_size' => null,
+                                        'position' => 1,
+                                    ]]);
+                                }
+
+                                return [
+                                    'id' => $lesson->id,
+                                    'title' => $lesson->title,
+                                    'description' => $lesson->description,
+                                    'file_path' => $lesson->file_path,
+                                    'duration' => $lesson->duration,
+                                    'position' => $lesson->position,
+                                    'is_published' => $lesson->is_published,
+                                    'created_at' => $lesson->created_at,
+                                    'updated_at' => $lesson->updated_at,
+                                    'lesson_type_id' => $lesson->lesson_type_id,
+                                    'lesson_type' => $lesson->lessonType ? [
+                                        'id' => $lesson->lessonType->id,
+                                        'name' => $lesson->lessonType->name,
+                                    ] : null,
+                                    'files' => $files->values(),
+                                ];
+                            })->values(),
+                        ];
+                    })
+                    ->values();
+
+                return [
+                    'id' => $course->id,
+                    'name' => $course->name,
+                    'description' => $course->description,
+                    'created_at' => $course->created_at,
+                    'updated_at' => $course->updated_at,
+                    'users_count' => $course->users->count(),
+                    'modules_count' => $modules->count(),
+                    'lessons_count' => $modules->sum(fn ($module) => $module['lessons']->count()),
+                    'modules' => $modules,
+                ];
+            })
+            ->values();
+
+        return Inertia::render('Admin/Courses/Index', [
+            'courses' => $courses,
+            'lessonTypes' => LessonType::query()
+                ->orderBy('name')
+                ->get(['id', 'name']),
+        ]);
+    }
+}

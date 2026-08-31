@@ -27,6 +27,7 @@ class AuthenticationTest extends TestCase
         ]);
 
         $this->assertAuthenticated();
+        $this->assertNotNull($user->fresh()->last_login_at);
         $response->assertRedirect(route('dashboard', absolute: false));
     }
 
@@ -48,7 +49,7 @@ class AuthenticationTest extends TestCase
 
         $response = $this->actingAs($user)->post('/logout');
 
+        $response->assertRedirect(route('login'));
         $this->assertGuest();
-        $response->assertRedirect('/');
     }
 }

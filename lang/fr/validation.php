@@ -1,0 +1,47 @@
+<?php
+
+return [
+    'accepted' => 'Le champ :attribute doit être accepté.',
+    'array' => 'Le champ :attribute doit être un tableau.',
+    'before' => 'Le champ :attribute doit contenir une date antérieure au :date.',
+    'confirmed' => 'La confirmation du champ :attribute ne correspond pas.',
+    'date' => 'Le champ :attribute doit être une date valide.',
+    'distinct' => 'Le champ :attribute contient une valeur en double.',
+    'email' => 'Le champ :attribute doit être une adresse e-mail valide.',
+    'exists' => 'La valeur sélectionnée pour le champ :attribute est invalide.',
+    'image' => 'Le champ :attribute doit être une image.',
+    'integer' => 'Le champ :attribute doit être un nombre entier.',
+    'in' => 'La valeur sélectionnée pour le champ :attribute est invalide.',
+    'max' => [
+        'array' => 'Le champ :attribute ne doit pas contenir plus de :max éléments.',
+        'file' => 'Le fichier :attribute ne doit pas dépasser :max kilo-octets.',
+        'numeric' => 'Le champ :attribute ne doit pas être supérieur à :max.',
+        'string' => 'Le champ :attribute ne doit pas dépasser :max caractères.',
+    ],
+    'mimes' => 'Le fichier :attribute doit être de type :values.',
+    'min' => [
+        'array' => 'Le champ :attribute doit contenir au moins :min éléments.',
+        'file' => 'Le fichier :attribute doit faire au moins :min kilo-octets.',
+        'numeric' => 'Le champ :attribute doit être au moins égal à :min.',
+        'string' => 'Le champ :attribute doit contenir au moins :min caractères.',
+    ],
+    'required' => 'Le champ :attribute est obligatoire.',
+    'string' => 'Le champ :attribute doit être une chaîne de caractères.',
+    'unique' => 'Cette valeur du champ :attribute est déjà utilisée.',
+
+    'attributes' => [
+        'first_name' => 'prénom',
+        'last_name' => 'nom',
+        'email' => 'adresse e-mail',
+        'date_of_birth' => 'date de naissance',
+        'sex' => 'sexe',
+        'phone_number' => 'numéro de téléphone',
+        'profile_picture' => 'photo de profil',
+        'password' => 'mot de passe',
+        'password_confirmation' => 'confirmation du mot de passe',
+        'id_1' => 'type d’utilisateur',
+        'id_2' => 'statut',
+        'course_ids' => 'cours',
+        'course_ids.*' => 'cours',
+    ],
+];

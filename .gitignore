@@ -20,8 +20,11 @@
 /public/storage
 /storage/*.key
 /storage/pail
+/storage/lessons
 /vendor
 _ide_helper.php
 Homestead.json
 Homestead.yaml
-Thumbs.db
+Thumbs.db 
+composer.json
+readme-lala.md
