@@ -1,4 +1,4 @@
-﻿<?php
+<?php
 
 use App\Http\Controllers\Admin\CourseController;
 use App\Http\Controllers\Admin\CourseManagementController;

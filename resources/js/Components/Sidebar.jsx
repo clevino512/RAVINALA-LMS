@@ -2,6 +2,7 @@ import { Link, usePage } from '@inertiajs/react';
 import {
     ArrowRightOnRectangleIcon,
     BookOpenIcon,
+    ClipboardDocumentCheckIcon,
     Cog6ToothIcon,
     HomeIcon,
     UsersIcon,
@@ -29,16 +30,19 @@ export default function Sidebar({ sidebarOpen, setSidebarOpen }) {
             ? [
                 { name: 'Utilisateurs', href: route('admin.users.index'), icon: UsersIcon, current: 'admin.users.*' },
                 { name: 'Cours', href: route('admin.lms.management'), icon: BookOpenIcon, current: 'admin.lms.*' },
+                { name: 'Évaluations', href: route('admin.evaluations.index'), icon: ClipboardDocumentCheckIcon, current: 'admin.evaluations.*' },
             ]
             : []),
         ...(isProfessor
             ? [
                 { name: 'Cours', href: route('professeur.courses.index'), icon: BookOpenIcon, current: 'professeur.courses.*' },
+                { name: 'Évaluations', href: route('professeur.evaluations.index'), icon: ClipboardDocumentCheckIcon, current: 'professeur.evaluations.*' },
             ]
             : []),
         ...(isStudent
             ? [
                 { name: 'Cours', href: route('etudiant.courses.index'), icon: BookOpenIcon, current: 'etudiant.courses.*' },
+                { name: 'Évaluations', href: route('etudiant.evaluations.index'), icon: ClipboardDocumentCheckIcon, current: 'etudiant.evaluations.*' },
             ]
             : []),
     ];

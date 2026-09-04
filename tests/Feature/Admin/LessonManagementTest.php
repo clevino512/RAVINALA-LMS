@@ -12,22 +12,16 @@ use App\Models\User;
 use App\Models\UserType;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
-use Illuminate\Support\Facades\File;
+use Illuminate\Support\Facades\Storage;
 use Tests\TestCase;
 
 class LessonManagementTest extends TestCase
 {
     use RefreshDatabase;
 
-    protected function tearDown(): void
-    {
-        File::deleteDirectory(public_path('lessons/data'));
-
-        parent::tearDown();
-    }
-
     public function test_an_administrator_can_create_a_lesson_with_multiple_files(): void
     {
+        Storage::fake('public');
         $status = Status::factory()->create(['name' => 'actif']);
         $adminType = UserType::factory()->create(['name' => 'admin']);
         $admin = User::factory()->create([
@@ -64,18 +58,18 @@ class LessonManagementTest extends TestCase
 
         $lesson = Lesson::query()->where('title', 'Lecon multimedia')->with('files')->firstOrFail();
         $this->assertCount(2, $lesson->files);
-        $this->assertSame('/lessons/data/cours.pdf', $lesson->file_path);
-        $this->assertFileExists(public_path(ltrim($lesson->file_path, '/')));
+        $this->assertSame('/storage/lessons/data/cours.pdf', $lesson->file_path);
         $this->assertSame($lesson->files->sortBy('position')->first()->file_path, $lesson->file_path);
-        $this->assertSame('/lessons/data/cours.pdf', $lesson->files[0]->file_path);
-        $this->assertSame('/lessons/data/video.mp4', $lesson->files[1]->file_path);
+        $this->assertSame('/storage/lessons/data/cours.pdf', $lesson->files[0]->file_path);
+        $this->assertSame('/storage/lessons/data/video.mp4', $lesson->files[1]->file_path);
         $lesson->files->each(
-            fn ($file) => $this->assertFileExists(public_path(ltrim($file->file_path, '/')))
+            fn ($file) => Storage::disk('public')->assertExists(str_replace('/storage/', '', $file->file_path))
         );
     }
 
     public function test_an_administrator_can_add_and_delete_an_individual_lesson_file(): void
     {
+        Storage::fake('public');
         $status = Status::factory()->create(['name' => 'actif']);
         $adminType = UserType::factory()->create(['name' => 'admin']);
         $admin = User::factory()->create([
@@ -117,8 +111,8 @@ class LessonManagementTest extends TestCase
 
         $lesson->refresh();
         $lessonFile = LessonFile::query()->where('lesson_id', $lesson->id)->firstOrFail();
-        $this->assertSame('/lessons/data/support.pdf', $lessonFile->file_path);
-        $this->assertFileExists(public_path(ltrim($lessonFile->file_path, '/')));
+        $this->assertSame('/storage/lessons/data/support.pdf', $lessonFile->file_path);
+        Storage::disk('public')->assertExists('lessons/data/support.pdf');
         $this->assertSame($lessonFile->file_path, $lesson->file_path);
 
         $this->actingAs($admin)->put(
@@ -137,6 +131,6 @@ class LessonManagementTest extends TestCase
         $lesson->refresh();
         $this->assertNull($lesson->file_path);
         $this->assertDatabaseMissing('lesson_files', ['id' => $lessonFile->id]);
-        $this->assertFileDoesNotExist(public_path('lessons/data/support.pdf'));
+        Storage::disk('public')->assertMissing('lessons/data/support.pdf');
     }
 }
